@@ -111,12 +111,12 @@ namespace TempWidget.Tests
                 Equal(0, alerts.Check(rows, settings, v => v.ToString()).Count);
                 Equal(1, alerts.Check(rows, settings, v => v.ToString()).Count);
             });
-            Run("CSV omits unavailable values without touching the filesystem", () =>
+            Run("CSV preserves unavailable numeric columns as empty cells", () =>
             {
                 var rows = Cpu(new FakeSensor("CPU Package", 0), new FakeSensor("CPU Total", 18, SensorType.Load));
                 CsvLog.FormatRows(rows, new DateTime(2026, 1, 2, 3, 4, 5), out string header, out string line);
-                Equal("Time,\"CPU Load (%)\"", header);
-                Equal("2026-01-02 03:04:05,18", line);
+                Equal("Time,\"cpu.load | Cpu | Load (%) | CPU: Synthetic\",\"cpu.temp | Cpu | Temperature (\u00B0C) | CPU: Synthetic\"", header);
+                Equal("2026-01-02 03:04:05,18,", line);
             });
 
             Run("EC contention performs zero port reads and zero releases", () =>
@@ -212,6 +212,7 @@ namespace TempWidget.Tests
                 now = TimeSpan.FromDays(1); schedule.Take(false, out slow, out battery); True(slow && battery);
                 schedule.Take(false, out slow, out battery); True(!slow && !battery);
             });
+            SafetyTests.Register(Run);
             Console.WriteLine($"RESULT: {_passed} passed, {_failed} failed. Synthetic tests only; no hardware/application startup.");
             return _failed == 0 ? 0 : 1;
         }

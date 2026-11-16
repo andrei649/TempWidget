@@ -7,7 +7,7 @@ GETTING STARTED
 2. On first start a welcome screen offers "Set up full sensors". One click:
    - Windows asks once for administrator rights
    - the PawnIO sensor driver is installed for you (included, no download)
-   - TempWidget is set to start with Windows, if you leave that ticked
+   - startup is optional and off by default; startup requests basic sensors
 3. Prefer not to? Choose "Continue with basic sensors" (GPU, memory, battery,
    CPU load). You can switch to full sensors later by clicking the
    "Limited mode" line on the widget.
@@ -48,8 +48,17 @@ verified (currently: System76 Bonobo WS bonw16). On other Clevo-based laptops
 you can try Settings -> Display -> Laptop fan readout -> On (read-only).
 
 UPGRADING FROM VERSION 1
-Version 2 reads the same settings file. Exit version 1 first, start version 2,
-and the "Start with Windows" entry is moved to the new location automatically.
+Version 2 reads the same settings file. Full sensors now require an explicit
+request each session. Startup entries are never moved or elevated automatically.
+If an older TempWidget scheduled task exists, review and remove it manually in
+Windows Task Scheduler. The app warns about it but will not change that task.
+
+CSV LOGGING
+Logging uses one file per day and column schema: TempWidget-v2-date-schema.csv.
+Columns are ordered by sensor key. Unavailable numeric readings have empty cells.
+Adding/removing/renaming a sensor or changing its unit selects a different file.
+Existing legacy CSV files are preserved. A mismatched or partial v2 file is not
+overwritten or appended to. See SAFETY-REVIEW.md for validation and limitations.
 
 PRIVACY
 No network connections, no telemetry, no accounts. See PRIVACY.txt.

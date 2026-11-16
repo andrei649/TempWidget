@@ -25,6 +25,7 @@ namespace TempWidget
         private DateTime _rangeSince = DateTime.Now;
         private SettingsForm _settingsForm;
         private Row _setupNotice; // result of driver setup, shown above everything else
+        private Row _startupNotice;
 
         // UI-thread state
         private List<Row> _lastRows = new List<Row> { new Row { Kind = RowKind.Value, Label = "Starting sensors…", Level = Level.Dim } };
@@ -99,7 +100,7 @@ namespace TempWidget
         private void WorkerLoop()
         {
             ISensorSource source = null;
-            if (!Program.Demo) AutoStart.Repair();
+            if (!Program.Demo) PostStartupNotice(AutoStart.StartupWarning());
             if (Program.SetupRequested && !Program.Demo) RunSetup();
             bool trim = false, librariesChecked = Program.Demo;
             CsvLog log = null;
@@ -181,7 +182,18 @@ namespace TempWidget
                 if (notice != null && IsHandleCreated)
                     try { BeginInvoke((Action)(() => { _setupNotice = notice; Relayout(); })); } catch (InvalidOperationException) { }
             }
-            if (Program.SetupAutoStart) AutoStart.Set(true);
+            if (Program.SetupAutoStart) PostStartupNotice(AutoStart.Set(true));
+        }
+
+        private void PostStartupNotice(string problem)
+        {
+            if (!IsHandleCreated || _exiting) return;
+            try { BeginInvoke((Action)(() =>
+            {
+                _startupNotice = problem == null ? null : new Row { Kind = RowKind.Notice, Action = NoticeAction.StartupSafety,
+                    Label = "Review startup settings - click", Detail = problem };
+                Relayout();
+            })); } catch (InvalidOperationException) { }
         }
 
         private static Row NoticeFor(DriverResult result)
@@ -366,6 +378,7 @@ namespace TempWidget
             var s = _settings;
             var rows = new List<Row>();
             if (_setupNotice != null) rows.Add(_setupNotice);
+            if (_startupNotice != null) rows.Add(_startupNotice);
             foreach (var r in _lastRows)
             {
                 // The setup result already says what is wrong; don't repeat it with the generic hint.
@@ -580,6 +593,8 @@ namespace TempWidget
         private void RunNotice(NoticeAction action)
         {
             if (action == NoticeAction.Elevate) EnableFullSensors();
+            else if (action == NoticeAction.StartupSafety)
+                MessageBox.Show(this, _startupNotice?.Detail ?? AutoStart.LegacyWarning, "Startup safety", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             else if (action == NoticeAction.Dismiss) { _setupNotice = null; Relayout(); }
             else if (action == NoticeAction.InstallDriver) InstallDriver();
             else if (action == NoticeAction.ShowLog) OpenUrl(System.IO.Path.Combine(Settings.Dir, "error.log"));
@@ -637,15 +652,13 @@ namespace TempWidget
             try { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); } catch { }
         }
 
-        /// <summary>Restarts as administrator and remembers the choice for next time.</summary>
+        /// <summary>Explicitly requests administrator rights for this session.</summary>
         public void EnableFullSensors()
         {
             if (Program.IsElevated) return;
-            _settings.PreferElevated = true;
             SavePosition();
             // Also install the driver in the elevated copy if this PC does not have it yet.
             if (Program.RelaunchElevated(DriverSetup.IsInstalled() ? null : "--setup")) ExitApp();
-            else { _settings.PreferElevated = false; _settings.Save(); }
         }
 
         // ---------- window behaviour ----------

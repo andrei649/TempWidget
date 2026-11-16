@@ -14,7 +14,7 @@ namespace TempWidget
         private ComboBox _interval, _size, _theme, _unit, _ec, _tray;
         private TrackBar _opacity;
         private Label _opacityText;
-        private CheckBox _top, _locked, _snap, _through, _autoStart, _battery, _elevated;
+        private CheckBox _top, _locked, _snap, _through, _autoStart, _battery;
         private CheckBox _cpu, _gpu, _ram, _fans, _drives, _bat, _compact, _spark, _hints, _background, _net, _log;
         private CheckBox _alerts;
         private NumericUpDown _alertCpu, _alertGpu, _alertDrive;
@@ -93,7 +93,8 @@ namespace TempWidget
             _through = Check(p, "Click-through (turn it off again from the tray icon)", ref y);
             y += 8;
             _autoStart = Check(p, "Start with Windows", ref y);
-            _elevated = Check(p, "Start with full sensors (asks for administrator rights)", ref y);
+            p.Controls.Add(Note("Startup uses basic sensors. Enable full sensors from the widget each session.", 16, y, 390, 34));
+            y += 38;
             _battery = Check(p, "Refresh more slowly on battery power", ref y);
             return p;
         }
@@ -230,7 +231,6 @@ namespace TempWidget
             _snap.Checked = s.SnapEdges;
             _through.Checked = s.ClickThrough;
             _autoStart.Checked = _autoStartWas;
-            _elevated.Checked = s.PreferElevated;
             _battery.Checked = s.BatterySaver;
 
             _cpu.Checked = s.ShowCpu; _gpu.Checked = s.ShowGpu; _ram.Checked = s.ShowRam;
@@ -264,7 +264,6 @@ namespace TempWidget
             s.Locked = _locked.Checked;
             s.SnapEdges = _snap.Checked;
             s.ClickThrough = _through.Checked;
-            s.PreferElevated = _elevated.Checked;
             s.BatterySaver = _battery.Checked;
 
             s.ShowCpu = _cpu.Checked; s.ShowGpu = _gpu.Checked; s.ShowRam = _ram.Checked;
@@ -291,9 +290,6 @@ namespace TempWidget
                 _autoStart.Checked = AutoStart.IsEnabled();
             }
 
-            // Newly asked for full sensors while running without them: restart elevated now.
-            if (!Program.Demo && s.PreferElevated && !old.PreferElevated && !Program.IsElevated)
-                _owner.EnableFullSensors();
         }
 
         // ---------- small builders ----------

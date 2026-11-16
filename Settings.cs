@@ -37,7 +37,7 @@ namespace TempWidget
         public int TrayMode = 1;           // tray icon shows: 0 app icon, 1 CPU, 2 GPU, 3 the hotter of the two
         public bool LogCsv;                // write every reading to a daily CSV file
         public bool Background;            // keep polling CPU/GPU while hidden (tray temperature + alerts)
-        public bool PreferElevated;        // relaunch as admin on start for full sensors
+        public bool PreferElevated;        // legacy file value; never triggers automatic elevation
         public bool Onboarded;             // the welcome screen has been answered
 
         // alerts (thresholds in °C)
@@ -113,7 +113,7 @@ namespace TempWidget
                 s.ShowNetwork = Bool(d, "ShowNetwork", true);
                 s.LogCsv = Bool(d, "LogCsv", false);
                 s.Background = Bool(d, "Background", s.Background);
-                // v1 always ran as administrator, so keep that behaviour for people upgrading.
+                // Preserve the legacy file value for compatibility; it is never used to auto-elevate.
                 s.PreferElevated = Bool(d, "PreferElevated", v1);
 
                 s.AlertsEnabled = Bool(d, "AlertsEnabled", s.AlertsEnabled);

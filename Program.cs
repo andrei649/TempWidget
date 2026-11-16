@@ -62,10 +62,11 @@ namespace TempWidget
                 if (Demo && welcomeShot >= 0 && welcomeShot + 1 < args.Length) return ScreenshotWelcome(args[welcomeShot + 1]);
 
                 var settings = Settings.Load();
-                SetupRequested = args.Contains("--setup");
-                SetupAutoStart = args.Contains("--autostart");
+                var launch = new LaunchOptions(args);
+                SetupRequested = launch.Setup;
+                SetupAutoStart = launch.AutoStart;
 
-                if (!Demo && !settings.Onboarded)
+                if (!Demo && !launch.Startup && !settings.Onboarded)
                 {
                     bool full, autoStart;
                     using (var welcome = new WelcomeForm())
@@ -75,7 +76,6 @@ namespace TempWidget
                         autoStart = welcome.StartWithWindows;
                     }
                     settings.Onboarded = true;
-                    settings.PreferElevated = full;
                     settings.Save();
 
                     if (full && IsElevated) { SetupRequested = true; SetupAutoStart = autoStart; }
@@ -86,20 +86,13 @@ namespace TempWidget
                         // The administrator prompt was declined: carry on with basic sensors.
                         try { owned = mutex.WaitOne(0); } catch (AbandonedMutexException) { owned = true; }
                         if (!owned) return 0;
-                        settings.PreferElevated = false;
-                        settings.Save();
-                        if (autoStart) AutoStart.Set(true);
+                        if (autoStart) ConfigureStartup();
                     }
-                    else if (autoStart) AutoStart.Set(true);
+                    else if (autoStart) ConfigureStartup();
                 }
 
-                if (!Demo && !IsElevated && settings.PreferElevated && !args.Contains("--restarted"))
-                {
-                    if (owned) { mutex.ReleaseMutex(); owned = false; }
-                    if (RelaunchElevated(null)) return 0;
-                    try { owned = mutex.WaitOne(0); } catch (AbandonedMutexException) { owned = true; }
-                    if (!owned) return 0;
-                }
+                // Persisted preferences never cause unattended elevation. Full sensors are
+                // requested explicitly through onboarding or the widget each session.
 
                 try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
                 Application.Run(new WidgetForm(settings));
@@ -127,6 +120,12 @@ namespace TempWidget
                 if (File.Exists(alias)) return alias;
             }
             return Application.ExecutablePath;
+        }
+
+        private static void ConfigureStartup()
+        {
+            string problem = AutoStart.Set(true);
+            if (problem != null) MessageBox.Show(problem, "Startup settings", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
 
         /// <summary>Starts an elevated copy (UAC prompt). False if the user declined or it failed.</summary>

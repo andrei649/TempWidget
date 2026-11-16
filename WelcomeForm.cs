@@ -45,7 +45,7 @@ namespace TempWidget
                 Location = new Point(30, 124), Size = new Size(418, 74),
             });
 
-            _autoStart = new CheckBox { Text = "Start TempWidget with Windows", Checked = true, Location = new Point(24, 206), Size = new Size(300, 22) };
+            _autoStart = new CheckBox { Text = "Start with Windows (basic sensors)", Checked = false, Location = new Point(24, 206), Size = new Size(350, 22) };
             Controls.Add(_autoStart);
 
             var full = new Button { Text = "Set up full sensors", FlatStyle = FlatStyle.System };

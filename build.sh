@@ -19,5 +19,5 @@ cp redist/PawnIO_setup.exe dist/TempWidget/   # official signed installer, run o
 python3 installer/make-wxs.py dist/TempWidget "$VERSION" "$PUBLISHER" Assets/TempWidget.ico > dist/TempWidget.wxs
 wixl --arch x64 -o "dist/TempWidget-$VERSION-x64.msi" dist/TempWidget.wxs
 
-zip -qr "dist/TempWidget-$VERSION-source.zip" *.cs *.csproj *.txt App.config app.manifest build.sh STORE.md SELLING.md DEVELOPMENT.md VALIDATION.md .gitignore Assets installer package redist tests -x 'tests/bin/*' 'tests/obj/*'
+zip -qr "dist/TempWidget-$VERSION-source.zip" *.cs *.csproj *.txt *.md App.config app.manifest build.sh .gitignore Assets installer package redist tests -x 'tests/bin/*' 'tests/obj/*'
 ls -la dist
