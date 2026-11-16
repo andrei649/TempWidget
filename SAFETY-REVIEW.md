@@ -11,7 +11,7 @@ it is not an independent human security certification or hardware validation.
 |---|---|
 | Autostart created a HighestAvailable task targeting the current EXE, including portable/user-writable folders. Repair could silently repoint it. | Removed task creation and startup repair entirely. Explicitly enabled unpackaged startup writes only a quoted per-user Run command with `--startup`. |
 | Persisted PreferElevated could trigger elevation on later launches, including startup. | No automatic elevation from saved preferences. Full sensors require an explicit request in onboarding or the widget each session. The legacy preference is preserved when settings are read/saved for compatibility, but is not acted on. |
-| Startup could enter onboarding or process setup flags. | `--startup` skips onboarding and suppresses driver/setup/autostart chaining flags. Startup is opt-in and unchecked in the welcome screen. |
+| Startup could enter onboarding or process setup flags. | `--startup` skips onboarding and suppresses driver/setup/autostart chaining flags. MSIX declares this marker and conservatively suppresses automatic onboarding on unmarked packaged launches too. Startup is opt-in and unchecked in the unpackaged welcome screen. |
 | Existing privileged tasks cannot safely be redirected during upgrade. | Read-only legacy task probe, prominent warning, and refusal to enable a new Run entry if a task exists or its state is unknown. No scheduled task is rewritten or removed. |
 | Daily CSV files could contain multiple incompatible headers and inconsistent row widths. | Versioned daily files with a full SHA-256 schema suffix. One file has one header/schema, including across restarts. Columns are sorted by key; numeric rows with missing/nonfinite values have empty cells. |
 | Display order or same-index replacement could change the meaning of columns. | Schema includes stable row key, section, label, unit and reported device header context. Reordering groups preserves their context; changed reported device metadata selects a separate file. |
@@ -30,7 +30,7 @@ The new Run command also enforces the documented 260-character limit; see
 
 - Windows x64, CLR4, .NET Framework 4.8 target; .NET SDK 10.0.404.
 - Release build of application and test project: **0 errors, 0 warnings**.
-- **59 tests passed, 0 failed**; original sensor/EC/deadline tests retained.
+- **64 tests passed, 0 failed**; original sensor/EC/deadline tests retained.
 - Startup tests use only `IStartupStore` fakes. No real registry, COM scheduler,
   startup settings, elevation or installer operations are invoked by tests.
 - CSV tests write synthetic fixtures only under `tests/bin/.../synthetic-tests`
@@ -72,3 +72,36 @@ remains best-effort, not a transactional or durable telemetry database.
 The earlier hardware and packaging limitations in `VALIDATION.md`, and the
 dependency/installer distribution limitations in `DEPENDENCIES.md`, still apply.
 This change is prepared for a draft PR only; no merge or deployment is authorized.
+
+## P2 follow-up: MSIX startup and reset settings
+
+The independent review correctly identified that the original MSIX startup
+extension launched TempWidget.exe without the marker. The original argument-only
+policy therefore did not suppress onboarding after settings reset. This review
+finding did not demonstrate automatic elevation.
+
+Microsoft documents `uap10:Parameters` as command-line parameters for desktop
+extensions with package identity. The manifest now requests `--startup` using
+that attribute and keeps the startup task disabled by default. The namespace
+is ignorable and the package's existing minimum OS declaration is unchanged.
+See [desktop:Extension parameters](https://learn.microsoft.com/en-us/uwp/schemas/appxpackage/uapmanifestschema/element-desktop-extension)
+and [desktop startup tasks](https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/desktop-to-uwp-extensions#start-an-executable-file-when-users-log-into-windows).
+
+The source does not assume that Windows will always deliver the optional
+argument. Package identity is not proof of an activation kind. As a conservative
+fallback, all packaged launches suppress automatic onboarding, including the
+first manual launch and launches after settings reset. A user can still request
+full sensors explicitly from the widget; explicit `--setup` handling is retained.
+Unpackaged first manual launch retains onboarding. Persisted elevation
+preferences remain ignored regardless of activation route.
+
+Five new regressions check the actual copied manifest, marked packaged startup,
+unmarked packaged launch after reset, unpackaged onboarding compatibility and
+explicit packaged setup. They test XML/argument/policy contracts only. The
+application was not installed, registered or activated through MSIX; no sign-in,
+Task Manager/Startup setting, reset of real settings, WinRT activation event,
+UAC or driver installation was exercised. Full manifest schema/package validation
+and Windows-version-specific activation behavior remain unverified. The guarantee
+is the conservative application policy, not experimentally proven logon detection.
+
+Local follow-up logs: `artifacts/msix-build.log`, `artifacts/msix-tests.log`.

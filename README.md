@@ -9,8 +9,12 @@ Targets Windows x64 and .NET Framework 4.8. This is an unreleased source
 revision, not an installed, signed or hardware-validated release.
 
 The reviewed Windows Release build passed with zero errors/warnings, and all
-59 synthetic tests passed. Real sensors, EC layout, visual rendering,
+64 synthetic tests passed. Real sensors, EC layout, visual rendering,
 sleep/resume, energy use and installer behavior remain untested.
+
+Packaged launches conservatively skip automatic onboarding, including a first
+manual launch or settings reset. Full sensors can still be requested explicitly
+from the widget. MSIX logon activation has not been tested on an installed package.
 
 - [Build and test instructions](DEVELOPMENT.md)
 - [Validation evidence and exact limits](VALIDATION.md)

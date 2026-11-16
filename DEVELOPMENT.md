@@ -98,3 +98,10 @@ includes key/section/label/unit in its schema, and uses a full SHA-256 schema
 suffix in the daily filename. One file contains one header and one schema,
 including across application restarts. Only recognized expired v2 logs are
 eligible for retention cleanup; legacy logs are left alone.
+
+MSIX startup declares `uap10:Parameters="--startup"`. Package identity is not
+treated as proof of logon activation: unmarked packaged launches also suppress
+automatic onboarding as a conservative fallback. This includes the first
+manual packaged launch and settings-reset case. Explicit full-sensor/setup
+actions remain available. Unit tests check the actual manifest and this policy;
+they do not validate Windows activation of an installed MSIX package.

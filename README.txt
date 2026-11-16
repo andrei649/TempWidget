@@ -4,13 +4,15 @@ TempWidget 2 - a small desktop widget for temperatures, fans and other sensors
 GETTING STARTED
 1. Install with TempWidget-2.1.0-x64.msi, or extract the portable zip anywhere
    and run TempWidget.exe (keep the other files next to it).
-2. On first start a welcome screen offers "Set up full sensors". One click:
+2. On first unpackaged start a welcome screen offers "Set up full sensors". One click:
    - Windows asks once for administrator rights
    - the PawnIO sensor driver is installed for you (included, no download)
    - startup is optional and off by default; startup requests basic sensors
 3. Prefer not to? Choose "Continue with basic sensors" (GPU, memory, battery,
    CPU load). You can switch to full sensors later by clicking the
    "Limited mode" line on the widget.
+   The MSIX/Store edition starts in basic mode without automatic onboarding,
+   including after settings reset. Request full sensors from the widget explicitly.
 
 USING IT
 - Drag the widget anywhere. Near a screen edge it snaps into place.

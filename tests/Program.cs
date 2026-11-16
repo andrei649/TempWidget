@@ -213,6 +213,7 @@ namespace TempWidget.Tests
                 schedule.Take(false, out slow, out battery); True(!slow && !battery);
             });
             SafetyTests.Register(Run);
+            MsixStartupTests.Register(Run);
             Console.WriteLine($"RESULT: {_passed} passed, {_failed} failed. Synthetic tests only; no hardware/application startup.");
             return _failed == 0 ? 0 : 1;
         }

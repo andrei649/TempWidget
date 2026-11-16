@@ -62,11 +62,11 @@ namespace TempWidget
                 if (Demo && welcomeShot >= 0 && welcomeShot + 1 < args.Length) return ScreenshotWelcome(args[welcomeShot + 1]);
 
                 var settings = Settings.Load();
-                var launch = new LaunchOptions(args);
+                var launch = new LaunchOptions(args, IsPackaged);
                 SetupRequested = launch.Setup;
                 SetupAutoStart = launch.AutoStart;
 
-                if (!Demo && !launch.Startup && !settings.Onboarded)
+                if (!Demo && launch.ShouldShowOnboarding(settings.Onboarded))
                 {
                     bool full, autoStart;
                     using (var welcome = new WelcomeForm())
