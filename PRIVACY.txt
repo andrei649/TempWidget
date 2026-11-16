@@ -1,0 +1,25 @@
+TempWidget privacy policy
+=========================
+Last updated: 16 November 2026
+
+TempWidget reads hardware sensors on your PC (temperatures, fan speeds, load,
+power, memory and battery values, and hardware model names) and displays them
+on your screen.
+
+- TempWidget does not collect, store or transmit any personal information.
+- TempWidget makes no network connections. There is no telemetry, no
+  analytics, no advertising and no account.
+- Your settings and an error log are kept in a local folder on your PC
+  (%APPDATA%\TempWidget). Nothing leaves your PC.
+- If you turn on logging, readings are written to CSV files in the same
+  local folder. They stay on your PC.
+- The "Copy sensor report" button puts a list of hardware model names and
+  sensor values on your clipboard. It is only shared if you paste it somewhere
+  yourself.
+
+Third-party software: CPU sensors are read through the PawnIO driver
+(https://pawnio.eu). Its official installer is included with TempWidget and is
+run only when you choose full sensors; nothing is downloaded. PawnIO has its
+own licence and can be removed separately in Windows Settings.
+
+Questions: CONTACT-EMAIL-HERE

@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MSIX manifest for the alternative "packaged" Store route (see STORE.md, option B).
+  Replace the three values marked REPLACE with the ones Partner Center shows under
+  Product management > Product identity after you reserve the app name.
+-->
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+         xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+         xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+         xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
+         xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+         IgnorableNamespaces="uap uap5 desktop rescap">
+  <Identity Name="REPLACE.PackageIdentityName" Publisher="CN=REPLACE-PUBLISHER-ID" Version="2.1.0.0" ProcessorArchitecture="x64" />
+  <Properties>
+    <DisplayName>TempWidget</DisplayName>
+    <PublisherDisplayName>REPLACE Publisher display name</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.17763.0" MaxVersionTested="10.0.26100.0" />
+  </Dependencies>
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+  <Applications>
+    <Application Id="TempWidget" Executable="TempWidget.exe" EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements DisplayName="TempWidget" Description="Temperatures, fans and other sensors on your desktop"
+                          BackgroundColor="#181A22" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png">
+        <uap:DefaultTile Wide310x150Logo="Assets\Wide310x150Logo.png" />
+      </uap:VisualElements>
+      <Extensions>
+        <!-- Stable launch path used for "Start with Windows" and for restarting with full sensors. -->
+        <uap5:Extension Category="windows.appExecutionAlias" Executable="TempWidget.exe" EntryPoint="Windows.FullTrustApplication">
+          <uap5:AppExecutionAlias>
+            <uap5:ExecutionAlias Alias="TempWidget.exe" />
+          </uap5:AppExecutionAlias>
+        </uap5:Extension>
+        <desktop:Extension Category="windows.startupTask" Executable="TempWidget.exe" EntryPoint="Windows.FullTrustApplication">
+          <desktop:StartupTask TaskId="TempWidgetStartup" Enabled="false" DisplayName="TempWidget" />
+        </desktop:Extension>
+      </Extensions>
+    </Application>
+  </Applications>
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+    <!-- Lets the app ask for administrator rights. Microsoft usually refuses this for Store apps;
+         delete the next line to ship a limited-sensors edition (no CPU temperature). -->
+    <rescap:Capability Name="allowElevation" />
+  </Capabilities>
+</Package>
