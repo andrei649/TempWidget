@@ -56,6 +56,25 @@ was blocked by its execution policy; no policy was changed. Interface checking
 instead used the tagged upstream source linked in DEVELOPMENT.md and the
 successful compilation against the actual release DLL.
 
+## Continuous integration
+
+`.github/workflows/ci.yml` now runs on GitHub-hosted `windows-latest` for every
+pull request and for pushes to `main`. It uses the normal NuGet restore path
+(no `OfflineReferenceDirectory`), builds `tests/TempWidget.Tests.csproj` and
+`TempWidget.csproj` in Release with warnings reported, and runs only
+`tests/bin/Release/net48/TempWidget.Tests.exe`; a non-zero exit fails the job.
+It never launches the application, installs a driver or changes autostart, uses
+no secrets and uploads no build outputs.
+
+First CI result, 2026-11-17 (PR #3, run 44036888949, .NET SDK 10.0.403 on
+Windows Server 10.0.26100): online NuGet restore succeeded, which closes the
+"normal online restore path remains unverified" gap above. Test project build:
+**0 warnings, 0 errors**. Runner: `RESULT: 36 passed, 0 failed.` Application
+Release rebuild: **0 warnings, 0 errors**.
+
+CI exercises the synthetic tests only. A hosted runner has no access to the
+laptop's sensors or EC, so every hardware item below remains untested.
+
 ## Safety and untested areas
 
 No PawnIO installer or supplied TempWidget binary was executed. The rebuilt
