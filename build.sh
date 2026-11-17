@@ -3,7 +3,7 @@
 # Needs: .NET SDK 8+, zip, python3, wixl (msitools).   Usage: ./build.sh ["Publisher name"]
 set -euo pipefail
 cd "$(dirname "$0")"
-VERSION=2.1.0
+VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' TempWidget.csproj)   # single source of truth
 PUBLISHER="${1:-TempWidget}"
 OUT=bin/Release/net48/win-x64
 

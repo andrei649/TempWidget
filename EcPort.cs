@@ -94,13 +94,16 @@ namespace TempWidget
     internal sealed class EcFans : System.IDisposable
     {
         private static readonly byte[] Registers = { 0xD0, 0xD2, 0xD4 };
+        // Laptop fans either stop (period 0) or spin at several hundred RPM or more. A period this long
+        // (e.g. 34 RPM from 0xF7xx on an empty fan-3 slot) is the controller's "no tach signal", not a speed.
+        private const int MinRpm = 200;
         private readonly IEcFanDevice _device;
         private bool _fan3Seen;
 
         public EcFans() : this(new PawnIoEcFanDevice()) { }
         internal EcFans(IEcFanDevice device) { _device = device ?? throw new ArgumentNullException(nameof(device)); }
 
-        /// <summary>RPM per fan; -1 when unknown. Fan 3 only once it has ever reported a value.</summary>
+        /// <summary>RPM per fan; -1 when unknown. Fan 3 only once it has ever reported a plausible speed.</summary>
         public int[] Read()
         {
             // Every call starts unknown: failed/contended reads never look like fresh RPM.
@@ -119,7 +122,8 @@ namespace TempWidget
                         if (raw == 0xFFFF) continue; // invalid/unavailable register, not a stopped fan
                         int rpm = raw == 0 ? 0 : 2156220 / raw;
                         if (rpm > 9000) continue; // implausible/torn sample: unknown this time
-                        if (i == 2 && rpm > 0) _fan3Seen = true;
+                        if (rpm < MinRpm) rpm = 0; // no tach signal: treat as not spinning
+                        if (i == 2 && rpm > 0) _fan3Seen = true; // a real third fan has reported a plausible speed
                         current[i] = rpm;
                     }
                 }

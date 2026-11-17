@@ -1,0 +1,75 @@
+name: Release
+
+# Builds the portable zip and the MSI installer and attaches them to a GitHub
+# Release named after the version in TempWidget.csproj (for example v2.1.0).
+# Runs when a version tag is pushed, or by hand from the Actions tab.
+# The repository stays source-only: binaries live in Releases, not in git.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create the release and upload its files
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      # Official signed PawnIO 2.2.0 installer; must match DriverSetup.cs.
+      PAWNIO_URL: https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe
+      PAWNIO_SHA256: 1f519a22e47187f70a1379a48ca604981c4fcf694f4e65b734aaa74a9fba3032
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Install MSI tooling
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends wixl zip
+
+      - name: Fetch and verify the PawnIO installer
+        run: |
+          curl -fsSL -o redist/PawnIO_setup.exe "$PAWNIO_URL"
+          echo "$PAWNIO_SHA256  redist/PawnIO_setup.exe" | sha256sum -c -
+
+      - name: Build portable zip and MSI
+        run: |
+          dotnet --version
+          bash build.sh
+          VERSION=$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' TempWidget.csproj)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          test -f "dist/TempWidget-$VERSION-portable.zip"
+          test -f "dist/TempWidget-$VERSION-x64.msi"
+
+      - name: Check the tag matches the project version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          if [ "${GITHUB_REF_NAME}" != "v${VERSION}" ]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match version ${VERSION} in TempWidget.csproj" >&2
+            exit 1
+          fi
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v${VERSION}"
+          FILES=("dist/TempWidget-${VERSION}-portable.zip" "dist/TempWidget-${VERSION}-x64.msi")
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${FILES[@]}" --clobber
+          else
+            gh release create "$TAG" "${FILES[@]}" --target "$GITHUB_SHA" --title "TempWidget ${VERSION}" \
+              --notes "Portable: extract the zip and run TempWidget.exe. Installer: run the .msi. Unsigned build: Windows SmartScreen may warn on first start."
+          fi
