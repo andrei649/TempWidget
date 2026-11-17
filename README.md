@@ -23,11 +23,33 @@ from the widget. MSIX logon activation has not been tested on an installed packa
 - [Original user documentation](README.txt)
 - [Third-party notices](THIRD-PARTY-NOTICES.txt)
 
-This repository contains source, tests, documentation and image/icon assets.
-It excludes executable releases, DLLs, installers, credentials, signing keys,
-settings, sensor reports, logs and local SDK/package state. It contains no
-deployment workflow. Existing packaging scripts need separate review and
-inputs before use.
+## Download
+
+Ready-to-run builds are on the [Releases page](https://github.com/andrei649/TempWidget/releases):
+
+- `TempWidget-<version>-portable.zip`: extract it and run `TempWidget.exe`
+  (keep the other files next to it).
+- `TempWidget-<version>-x64.msi`: the installer.
+
+Builds are unsigned, so Windows SmartScreen may warn on first start.
+
+## Making a release
+
+The [Release workflow](.github/workflows/release.yml) builds both files on
+GitHub and attaches them to a release named after `<Version>` in
+`TempWidget.csproj`. Either push a matching tag:
+
+```bash
+git tag v2.1.0 && git push origin v2.1.0
+```
+
+or run **Actions > Release > Run workflow**. Running it again for the same
+version replaces that release's files. The workflow downloads the official
+PawnIO 2.2.0 installer and checks its SHA-256 before bundling it.
+
+The git repository itself stays source-only: executables, DLLs, installers,
+credentials, signing keys, settings, sensor reports, logs and local SDK/package
+state are kept out of it by `.gitignore`.
 
 The supplied application source had no explicit application-wide license.
 This import does not assign one or grant redistribution rights to third-party

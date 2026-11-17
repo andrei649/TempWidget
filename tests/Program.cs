@@ -164,6 +164,13 @@ namespace TempWidget.Tests
                 var device = EcDevice(); device.Set(0, 1); device.Set(1, 0xFFFF);
                 AllUnknown(new EcFans(device).Read());
             });
+            Run("EC near-sentinel period is no tach signal and does not reveal fan 3", () =>
+            {
+                // Seen on a System76 bonw16: the empty fan-3 slot reads 0xF7BA, which the formula turns into 34 RPM.
+                var device = EcDevice(); device.Set(0, 0xF7BA); device.Set(2, 0xF7BA);
+                var result = new EcFans(device).Read();
+                Equal(2, result.Length); Equal(0, result[0]); Equal(1078, result[1]);
+            });
             Run("EC zero period reports a stopped fan", () =>
             {
                 var device = EcDevice(); device.Set(0, 0);
