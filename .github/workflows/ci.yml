@@ -1,0 +1,57 @@
+name: CI
+
+# Builds the application and the synthetic test runner, then runs only the
+# synthetic tests. It never launches TempWidget, installs a driver, touches
+# autostart, uses secrets, publishes, or uploads build outputs.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and synthetic tests (net48 x64)
+    runs-on: windows-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: '1'
+      DOTNET_NOLOGO: '1'
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 'false'
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Show .NET SDK
+        run: dotnet --info
+
+      # Normal NuGet path (no OfflineReferenceDirectory), as in DEVELOPMENT.md.
+      - name: Build synthetic tests (Release)
+        run: |
+          dotnet build tests/TempWidget.Tests.csproj -c Release
+          if ($LASTEXITCODE -ne 0) { throw "Test build failed with exit code $LASTEXITCODE" }
+
+      - name: Run synthetic tests
+        run: |
+          $exe = './tests/bin/Release/net48/TempWidget.Tests.exe'
+          if (-not (Test-Path -LiteralPath $exe)) { throw "Test runner not found at $exe" }
+          & $exe
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { throw "Synthetic tests failed with exit code $code" }
+
+      - name: Build application (Release, warnings reported)
+        run: |
+          dotnet build TempWidget.csproj -c Release --no-incremental "-consoleLoggerParameters:Summary"
+          if ($LASTEXITCODE -ne 0) { throw "Application build failed with exit code $LASTEXITCODE" }
