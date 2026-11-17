@@ -284,6 +284,7 @@ namespace TempWidget
                     if (ec[i] < 0)
                     {
                         fan.Level = Level.Dim;
+                        fan.Unit = "RPM";
                         fan.Compact = fan.Label;
                         fan.Detail = "EC fan reading unavailable; no current RPM measurement. Previous readings are not reused.";
                     }

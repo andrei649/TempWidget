@@ -23,6 +23,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="System.Management" />
+    <Reference Include="Microsoft.CSharp" />
     <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" Condition="'$(OfflineReferenceDirectory)' == ''" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" Condition="'$(OfflineReferenceDirectory)' == ''" />
   </ItemGroup>

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace TempWidget
 {
@@ -19,7 +20,10 @@ namespace TempWidget
         public List<string> Check(List<Row> rows, Settings s, Func<float, string> formatTemp)
         {
             var messages = new List<string>();
-            if (!s.AlertsEnabled) return messages;
+            if (!s.AlertsEnabled) { _states.Clear(); return messages; }
+            var present = new HashSet<string>(rows.Where(r => r.Kind == RowKind.Temp && r.Key != null).Select(r => r.Key));
+            foreach (var pair in _states)
+                if (!present.Contains(pair.Key)) pair.Value.Over = 0;
             foreach (var r in rows)
             {
                 if (r.Kind != RowKind.Temp || r.Key == null) continue;

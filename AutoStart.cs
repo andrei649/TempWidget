@@ -1,156 +1,109 @@
 using System;
-using System.Diagnostics;
-using System.IO;
-using System.Security;
-using System.Security.Principal;
-using System.Text;
+using System.Runtime.InteropServices;
 using Microsoft.Win32;
 
 namespace TempWidget
 {
-    /// <summary>
-    /// Start with Windows.
-    ///  - Running as admin: a Task Scheduler task with "highest privileges", so full sensors
-    ///    are available at logon without a UAC prompt.
-    ///  - Running without admin: a per-user Run entry (limited sensors at logon).
-    /// </summary>
+    internal enum LegacyStartupTask { Absent, Present, Unknown }
+
+    internal interface IStartupStore
+    {
+        LegacyStartupTask ReadLegacyTask();
+        string ReadRunValue();
+        void WriteRunValue(string command);
+        void DeleteRunValue();
+    }
+
+    /// <summary>No scheduled task creation, elevation or automatic repair of startup entries.</summary>
     internal static class AutoStart
     {
-        private const string TaskName = "TempWidget";
+        internal const string LegacyWarning = "An older TempWidget scheduled task exists, or could not be checked. " +
+            "Review and remove that task in Windows Task Scheduler before enabling startup here. " +
+            "An elevated task pointing to a writable folder can run replaced program files with administrator rights. " +
+            "TempWidget will not rewrite or remove that task automatically.";
+
+        public static bool IsEnabled()
+        {
+            var store = new WindowsStartupStore();
+            return store.ReadRunValue() != null || store.ReadLegacyTask() != LegacyStartupTask.Absent;
+        }
+
+        public static string StartupWarning() => new WindowsStartupStore().ReadLegacyTask() == LegacyStartupTask.Absent ? null : LegacyWarning;
+
+        public static string Set(bool enable) => Configure(enable, Program.IsPackaged, Program.LaunchPath(), new WindowsStartupStore());
+
+        internal static string Configure(bool enable, bool packaged, string executable, IStartupStore store)
+        {
+            try
+            {
+                var legacy = store.ReadLegacyTask();
+                if (!enable)
+                {
+                    store.DeleteRunValue();
+                    return legacy == LegacyStartupTask.Absent ? null : LegacyWarning;
+                }
+                if (legacy != LegacyStartupTask.Absent) return LegacyWarning;
+                if (packaged) return "Manage TempWidget under Windows Settings > Apps > Startup. Startup uses basic sensors; enable full sensors manually for each session.";
+                store.WriteRunValue(StartupCommand(executable));
+                return null;
+            }
+            catch { return "Could not update the per-user startup entry. No elevated startup task was created."; }
+        }
+
+        internal static string StartupCommand(string executable)
+        {
+            if (string.IsNullOrWhiteSpace(executable) || executable.Length < 4 ||
+                !char.IsLetter(executable[0]) || executable[1] != ':' || executable[2] != '\\' ||
+                !executable.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ||
+                executable.IndexOfAny(new[] { '"', '\r', '\n', '\0' }) >= 0)
+                throw new ArgumentException("Startup requires a local absolute executable path.");
+            string command = "\"" + executable + "\" --startup";
+            if (command.Length > 260) throw new ArgumentException("Startup command exceeds the Windows Run key limit.");
+            return command;
+        }
+    }
+
+    internal sealed class WindowsStartupStore : IStartupStore
+    {
+        private const string Name = "TempWidget";
         private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
 
-        public static bool IsEnabled() => TaskExists() || RunValue() != null;
-
-        /// <summary>Returns null on success, otherwise a message for the user.</summary>
-        public static string Set(bool enable)
+        public string ReadRunValue()
         {
-            if (!enable)
-            {
-                try { using (var k = Registry.CurrentUser.OpenSubKey(RunKey, true)) k?.DeleteValue(TaskName, false); } catch { }
-                if (TaskExists() && Schtasks($"/Delete /TN \"{TaskName}\" /F") != 0)
-                    return "The startup task was created with administrator rights. Enable full sensors first, then turn this off again.";
-                return null;
-            }
-
-            if (Program.IsElevated)
-            {
-                try { using (var k = Registry.CurrentUser.OpenSubKey(RunKey, true)) k?.DeleteValue(TaskName, false); } catch { }
-                return CreateTask() ? null : "Could not create the startup task.";
-            }
-
-            if (Program.IsPackaged)
-            {
-                // Store installs manage unelevated startup through Windows itself.
-                try { Process.Start(new ProcessStartInfo("ms-settings:startupapps") { UseShellExecute = true }); } catch { }
-                return "Turn on TempWidget in the Windows Startup apps page that just opened.\n\n" +
-                       "For full sensors at startup, enable full sensors first and then tick this option again.";
-            }
-
-            try
-            {
-                using (var k = Registry.CurrentUser.CreateSubKey(RunKey))
-                    k.SetValue(TaskName, "\"" + Program.LaunchPath() + "\"");
-                return null;
-            }
-            catch { return "Could not write the startup entry."; }
-        }
-
-        /// <summary>Re-points an existing startup entry at the current program location.</summary>
-        public static void Repair()
-        {
-            try
-            {
-                string path = Program.LaunchPath();
-                string run = RunValue();
-                if (run != null && run.IndexOf(path, StringComparison.OrdinalIgnoreCase) < 0)
-                    using (var k = Registry.CurrentUser.CreateSubKey(RunKey)) k.SetValue(TaskName, "\"" + path + "\"");
-
-                if (!Program.IsElevated) return;
-                string xml = SchtasksOutput($"/Query /TN \"{TaskName}\" /XML");
-                if (xml != null && xml.IndexOf(SecurityElement.Escape(path), StringComparison.OrdinalIgnoreCase) < 0)
-                    CreateTask();
-            }
-            catch { }
-        }
-
-        private static string RunValue()
-        {
-            try { using (var k = Registry.CurrentUser.OpenSubKey(RunKey)) return k?.GetValue(TaskName) as string; }
+            try { using (var key = Registry.CurrentUser.OpenSubKey(RunKey)) return key?.GetValue(Name) as string; }
             catch { return null; }
         }
-
-        private static bool TaskExists() => Schtasks($"/Query /TN \"{TaskName}\"") == 0;
-
-        private static bool CreateTask()
+        public void WriteRunValue(string command)
         {
-            string user = SecurityElement.Escape(WindowsIdentity.GetCurrent().Name);
-            string exe = SecurityElement.Escape(Program.LaunchPath());
-            string xml = $@"<?xml version=""1.0"" encoding=""UTF-16""?>
-<Task version=""1.2"" xmlns=""http://schemas.microsoft.com/windows/2004/02/mit/task"">
-  <Triggers>
-    <LogonTrigger><Enabled>true</Enabled><UserId>{user}</UserId><Delay>PT10S</Delay></LogonTrigger>
-  </Triggers>
-  <Principals>
-    <Principal id=""Author""><UserId>{user}</UserId><LogonType>InteractiveToken</LogonType><RunLevel>HighestAvailable</RunLevel></Principal>
-  </Principals>
-  <Settings>
-    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
-    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
-    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
-    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>
-    <Priority>7</Priority>
-  </Settings>
-  <Actions Context=""Author""><Exec><Command>{exe}</Command><Arguments>--restarted</Arguments></Exec></Actions>
-</Task>";
-            string tmp = Path.Combine(Path.GetTempPath(), "TempWidget-task.xml");
-            try
-            {
-                File.WriteAllText(tmp, xml, Encoding.Unicode);
-                return Schtasks($"/Create /TN \"{TaskName}\" /XML \"{tmp}\" /F") == 0;
-            }
-            catch { return false; }
-            finally { try { File.Delete(tmp); } catch { } }
+            using (var key = Registry.CurrentUser.CreateSubKey(RunKey)) key.SetValue(Name, command, RegistryValueKind.String);
+        }
+        public void DeleteRunValue()
+        {
+            using (var key = Registry.CurrentUser.OpenSubKey(RunKey, true)) key?.DeleteValue(Name, false);
         }
 
-        /// <summary>Standard output of schtasks, or null if it failed (e.g. the task does not exist).</summary>
-        private static string SchtasksOutput(string args)
+        public LegacyStartupTask ReadLegacyTask()
         {
+            // Read-only COM query: no scheduler subprocess, temporary task XML, or task writes.
+            object service = null, folder = null, task = null;
             try
             {
-                var psi = new ProcessStartInfo("schtasks.exe", args)
-                {
-                    CreateNoWindow = true, UseShellExecute = false,
-                    RedirectStandardOutput = true, RedirectStandardError = true,
-                };
-                using (var p = Process.Start(psi))
-                {
-                    string output = p.StandardOutput.ReadToEnd();
-                    p.StandardError.ReadToEnd();
-                    p.WaitForExit();
-                    return p.ExitCode == 0 ? output : null;
-                }
+                var type = Type.GetTypeFromProgID("Schedule.Service");
+                if (type == null) return LegacyStartupTask.Unknown;
+                service = Activator.CreateInstance(type);
+                ((dynamic)service).Connect();
+                folder = ((dynamic)service).GetFolder("\\");
+                task = ((dynamic)folder).GetTask(Name);
+                return LegacyStartupTask.Present;
             }
-            catch { return null; }
-        }
-
-        private static int Schtasks(string args)
-        {
-            try
+            catch (COMException ex) when (ex.ErrorCode == unchecked((int)0x80070002)) { return LegacyStartupTask.Absent; }
+            catch { return LegacyStartupTask.Unknown; }
+            finally
             {
-                var psi = new ProcessStartInfo("schtasks.exe", args)
-                {
-                    CreateNoWindow = true, UseShellExecute = false,
-                    RedirectStandardOutput = true, RedirectStandardError = true,
-                };
-                using (var p = Process.Start(psi))
-                {
-                    p.StandardOutput.ReadToEnd();
-                    p.StandardError.ReadToEnd();
-                    p.WaitForExit();
-                    return p.ExitCode;
-                }
+                foreach (object item in new[] { task, folder, service })
+                    if (item != null && Marshal.IsComObject(item))
+                        try { Marshal.FinalReleaseComObject(item); } catch { }
             }
-            catch { return -1; }
         }
     }
 }

@@ -8,6 +8,7 @@
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
   </PropertyGroup>
   <ItemGroup>
+    <None Include="..\package\AppxManifest.xml" Link="Fixtures\AppxManifest.xml" CopyToOutputDirectory="PreserveNewest" />
     <ProjectReference Include="..\TempWidget.csproj" />
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" Condition="'$(OfflineReferenceDirectory)' == ''" />
   </ItemGroup>

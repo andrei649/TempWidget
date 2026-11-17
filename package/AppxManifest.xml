@@ -7,9 +7,10 @@
 <Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
          xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
          xmlns:uap5="http://schemas.microsoft.com/appx/manifest/uap/windows10/5"
+         xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
          xmlns:desktop="http://schemas.microsoft.com/appx/manifest/desktop/windows10"
          xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-         IgnorableNamespaces="uap uap5 desktop rescap">
+         IgnorableNamespaces="uap uap5 uap10 desktop rescap">
   <Identity Name="REPLACE.PackageIdentityName" Publisher="CN=REPLACE-PUBLISHER-ID" Version="2.1.0.0" ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>TempWidget</DisplayName>
@@ -35,7 +36,9 @@
             <uap5:ExecutionAlias Alias="TempWidget.exe" />
           </uap5:AppExecutionAlias>
         </uap5:Extension>
-        <desktop:Extension Category="windows.startupTask" Executable="TempWidget.exe" EntryPoint="Windows.FullTrustApplication">
+        <!-- Pass the startup marker where uap10 parameters are supported. If ignored on
+             an older Windows version, the app still suppresses packaged onboarding. -->
+        <desktop:Extension Category="windows.startupTask" Executable="TempWidget.exe" EntryPoint="Windows.FullTrustApplication" uap10:Parameters="--startup">
           <desktop:StartupTask TaskId="TempWidgetStartup" Enabled="false" DisplayName="TempWidget" />
         </desktop:Extension>
       </Extensions>

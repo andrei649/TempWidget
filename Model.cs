@@ -9,7 +9,7 @@ namespace TempWidget
 
     internal enum Level { Dim, Normal, Good, Warm, Hot }
 
-    internal enum NoticeAction { None, Elevate, InstallDriver, Dismiss, FileBlocked, ShowLog }
+    internal enum NoticeAction { None, Elevate, InstallDriver, Dismiss, FileBlocked, ShowLog, StartupSafety }
 
     /// <summary>One line of the widget. Sensor sources produce these; the form only formats and paints them.</summary>
     internal sealed class Row

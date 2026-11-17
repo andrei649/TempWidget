@@ -19,7 +19,9 @@ Its fakes implement the real LibreHardwareMonitor interfaces. It calls row
 builders, elapsed-time scheduling, a fake EC transport, temperature formatting,
 tray selection, history, alerts and CSV formatting. It never constructs
 `Computer`, `PawnIoEcFanDevice`, a Form, or the application entry point. It does
-not write settings, CSV logs or startup entries.
+not write user settings, user logs or startup entries. CSV filesystem tests
+write synthetic fixtures only under the test output directory in the workspace;
+registry and task behavior is tested through a fake store.
 
 ## Offline build from an existing portable release
 
@@ -58,7 +60,8 @@ unverified steps for this patch.
   row (or indexed CPU key) with `N/A` in full/compact views and the tray tooltip.
   An unavailable tray selection uses the normal app icon. Hottest-of-CPU/GPU
   mode uses whichever valid reading remains. Missing readings do not enter
-  history, numeric CSV output or alert comparisons. They reset consecutive
+  history or alert comparisons. CSV preserves known numeric columns with empty
+  cells for unavailable readings. They reset consecutive
   over-temperature samples without falsely rearming an alert.
 - Direct EC fan reads require acquisition of `Global\Access_EC`. Missing mutex
   access, timeout or an acquisition exception causes no port reads. A failed,
@@ -86,3 +89,19 @@ application source. The earlier validation snapshot is recorded in `VALIDATION.m
 The synthetic fakes were checked against the tagged upstream interfaces:
 [IHardware 0.9.6](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/blob/v0.9.6/LibreHardwareMonitorLib/Hardware/IHardware.cs)
 and [ISensor 0.9.6](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor/blob/v0.9.6/LibreHardwareMonitorLib/Hardware/ISensor.cs).
+
+The startup/CSV follow-up is documented in `SAFETY-REVIEW.md`. Startup entries
+request basic mode with `--startup`; persisted elevation preferences do not
+cause automatic UAC requests. Legacy scheduler tasks are only queried and
+warned about, never repaired or deleted. CSV v2 sorts columns by stable key,
+includes key/section/label/unit in its schema, and uses a full SHA-256 schema
+suffix in the daily filename. One file contains one header and one schema,
+including across application restarts. Only recognized expired v2 logs are
+eligible for retention cleanup; legacy logs are left alone.
+
+MSIX startup declares `uap10:Parameters="--startup"`. Package identity is not
+treated as proof of logon activation: unmarked packaged launches also suppress
+automatic onboarding as a conservative fallback. This includes the first
+manual packaged launch and settings-reset case. Explicit full-sensor/setup
+actions remain available. Unit tests check the actual manifest and this policy;
+they do not validate Windows activation of an installed MSIX package.
