@@ -34,9 +34,10 @@ namespace TempWidget
 
             // Direct EC reads only on laptops where the register layout has been verified,
             // unless the user explicitly opted in. Unknown EC layouts must not be probed automatically.
-            bool ecWanted = s.EcMode == 1 || (s.EcMode == 0 && IsVerifiedEcBoard());
-            if (s.ShowFans && ecWanted && Program.IsElevated && PawnIoInstalled())
-                try { _ecFans = new EcFans(); } catch { _ecFans = null; }
+            int verifiedFans = VerifiedEcFanCount();
+            int ecFanCount = s.EcMode == 1 ? 3 : (s.EcMode == 0 ? verifiedFans : 0);
+            if (s.ShowFans && ecFanCount > 0 && Program.IsElevated && PawnIoInstalled())
+                try { _ecFans = new EcFans(ecFanCount); } catch { _ecFans = null; }
         }
 
         private static Computer Open(Settings s, bool storage, bool boards)
@@ -64,16 +65,19 @@ namespace TempWidget
             try { return LibreHardwareMonitor.PawnIo.PawnIo.IsInstalled; } catch { return false; }
         }
 
-        /// <summary>Laptops whose Clevo-layout fan registers were confirmed against real readings.</summary>
-        private bool IsVerifiedEcBoard()
+        /// <summary>Fan count for laptops whose Clevo-layout fan registers were confirmed against real hardware; 0 if unverified.</summary>
+        private int VerifiedEcFanCount()
         {
             try
             {
                 var sys = _computer.SMBios?.System;
-                if (sys == null) return false;
-                return Eq(sys.ManufacturerName, "System76") && Eq(sys.Version, "bonw16");
+                if (sys == null) return 0;
+                // System76 Bonobo WS (bonw16 / Clevo X580) has two physical fans (CPU 0xD0, GPU 0xD2);
+                // 0xD4/0xD5 is unpopulated and can hold unrelated EC bytes (e.g. 0x00F0 -> 8984 RPM).
+                if (Eq(sys.ManufacturerName, "System76") && Eq(sys.Version, "bonw16")) return 2;
+                return 0;
             }
-            catch { return false; }
+            catch { return 0; }
         }
 
         private static bool Eq(string a, string b) => string.Equals(a?.Trim(), b, StringComparison.OrdinalIgnoreCase);

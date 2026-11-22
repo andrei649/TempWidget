@@ -98,23 +98,29 @@ namespace TempWidget
         // (e.g. 34 RPM from 0xF7xx on an empty fan-3 slot) is the controller's "no tach signal", not a speed.
         private const int MinRpm = 200;
         private readonly IEcFanDevice _device;
+        private readonly int _fanCount;
         private bool _fan3Seen;
 
-        public EcFans() : this(new PawnIoEcFanDevice()) { }
-        internal EcFans(IEcFanDevice device) { _device = device ?? throw new ArgumentNullException(nameof(device)); }
+        public EcFans(int maxFans = 3) : this(new PawnIoEcFanDevice(), maxFans) { }
+        internal EcFans(IEcFanDevice device, int maxFans = 3)
+        {
+            _device = device ?? throw new ArgumentNullException(nameof(device));
+            _fanCount = Math.Max(1, Math.Min(Registers.Length, maxFans));
+        }
 
         /// <summary>RPM per fan; -1 when unknown. Fan 3 only once it has ever reported a plausible speed.</summary>
         public int[] Read()
         {
             // Every call starts unknown: failed/contended reads never look like fresh RPM.
-            var current = new[] { -1, -1, -1 };
+            var current = new int[_fanCount];
+            for (int i = 0; i < current.Length; i++) current[i] = -1;
             bool owned = false;
             try
             {
                 owned = _device.TryAcquire(50);
                 if (owned)
                 {
-                    for (int i = 0; i < Registers.Length; i++)
+                    for (int i = 0; i < _fanCount; i++)
                     {
                         if (!_device.TryRead(Registers[i], out byte hi) || !_device.TryRead((byte)(Registers[i] + 1), out byte lo))
                             continue;
@@ -130,7 +136,7 @@ namespace TempWidget
             }
             catch { /* driver or mutex failure: unmeasured fans remain unknown */ }
             finally { if (owned) try { _device.Release(); } catch { } }
-            return _fan3Seen ? current : new[] { current[0], current[1] };
+            return _fanCount < 3 || _fan3Seen ? current : new[] { current[0], current[1] };
         }
 
         public void Dispose()

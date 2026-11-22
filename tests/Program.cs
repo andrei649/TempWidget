@@ -171,6 +171,14 @@ namespace TempWidget.Tests
                 var result = new EcFans(device).Read();
                 Equal(2, result.Length); Equal(0, result[0]); Equal(1078, result[1]);
             });
+            Run("EC two-fan verified board never reads register 0xD4/0xD5", () =>
+            {
+                // Seen on a System76 bonw16: unrelated EC bytes 0x00F0 at 0xD4/0xD5 decode to 8984 RPM if probed.
+                var device = EcDevice(); device.Set(2, 0x00F0);
+                var result = new EcFans(device, maxFans: 2).Read();
+                Equal(2, result.Length); Equal(2156, result[0]); Equal(1078, result[1]);
+                Equal(4, device.Reads); Equal(1, device.Releases);
+            });
             Run("EC zero period reports a stopped fan", () =>
             {
                 var device = EcDevice(); device.Set(0, 0);
