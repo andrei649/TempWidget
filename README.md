@@ -25,11 +25,11 @@ from the widget. MSIX logon activation has not been tested on an installed packa
 
 ## Run locally (latest / WIP)
 
-Double-click `Start.cmd` in the repository root to build (automatically when `dist\TempWidget.exe` is missing or behind the current commit) and launch the latest local build from `dist\TempWidget.exe`.
+Double-click `TempWidget.exe` or `Start.cmd` in the repository root to build (automatically when `dist\TempWidget.exe` is missing or behind the current commit) and launch the latest local build from `dist\TempWidget.exe`.
 
 - Rebuild explicitly: `Start.cmd --rebuild` or `powershell -NoProfile -ExecutionPolicy Bypass -File .\build-local.ps1 -Force`
-- Run simulated demo mode: `Start.cmd --demo`
-- `dist\` stays gitignored so the repository remains clean for `git pull` / `update-repos.ps1`, while always holding a runnable executable.
+- Run simulated demo mode: `TempWidget.exe --demo` or `Start.cmd --demo`
+- `TempWidget.exe` (root launcher) and `dist\` stay gitignored so the repository remains clean for `git pull` / `update-repos.ps1`, while always keeping a runnable executable directly in the repo folder.
 
 ## Download
 
