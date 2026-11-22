@@ -23,10 +23,19 @@ from the widget. MSIX logon activation has not been tested on an installed packa
 - [Original user documentation](README.txt)
 - [Third-party notices](THIRD-PARTY-NOTICES.txt)
 
+## Run locally (latest / WIP)
+
+Double-click `Start.cmd` in the repository root to build (automatically when `dist\TempWidget.exe` is missing or behind the current commit) and launch the latest local build from `dist\TempWidget.exe`.
+
+- Rebuild explicitly: `Start.cmd --rebuild` or `powershell -NoProfile -ExecutionPolicy Bypass -File .\build-local.ps1 -Force`
+- Run simulated demo mode: `Start.cmd --demo`
+- `dist\` stays gitignored so the repository remains clean for `git pull` / `update-repos.ps1`, while always holding a runnable executable.
+
 ## Download
 
 Ready-to-run builds are on the [Releases page](https://github.com/andrei649/TempWidget/releases):
 
+- **Rolling WIP pre-release (`wip`):** automatically rebuilt on every push to `main` or `wip/**` by [WIP Release](.github/workflows/wip-release.yml) (`TempWidget-wip-portable.zip` and `TempWidget-wip-x64.msi`).
 - `TempWidget-<version>-portable.zip`: extract it and run `TempWidget.exe`
   (keep the other files next to it).
 - `TempWidget-<version>-x64.msi`: the installer.
