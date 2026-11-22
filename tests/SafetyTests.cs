@@ -49,6 +49,14 @@ namespace TempWidget.Tests
                 True(AutoStart.Configure(true, false, @"C:\TempWidget.exe", store) != null);
                 Equal(0, store.Writes);
             });
+            run("Startup COM probe classifies FileNotFoundException as Absent and other errors as Unknown", () =>
+            {
+                Equal(LegacyStartupTask.Absent, WindowsStartupStore.ClassifyTaskProbeError(new FileNotFoundException()));
+                Equal(LegacyStartupTask.Absent, WindowsStartupStore.ClassifyTaskProbeError(new System.Runtime.InteropServices.COMException("missing", unchecked((int)0x80070002))));
+                Equal(LegacyStartupTask.Absent, WindowsStartupStore.ClassifyTaskProbeError(new System.Reflection.TargetInvocationException(new FileNotFoundException())));
+                Equal(LegacyStartupTask.Unknown, WindowsStartupStore.ClassifyTaskProbeError(new UnauthorizedAccessException()));
+                Equal(LegacyStartupTask.Unknown, WindowsStartupStore.ClassifyTaskProbeError(new System.Runtime.InteropServices.COMException("denied", unchecked((int)0x80070005))));
+            });
             run("Startup rejects quote/control/relative/network/overlong commands", () =>
             {
                 foreach (string path in new[] { "TempWidget.exe", @"\\server\share\TempWidget.exe", "C:\\evil\" --setup.exe",

@@ -96,14 +96,23 @@ namespace TempWidget
                 task = ((dynamic)folder).GetTask(Name);
                 return LegacyStartupTask.Present;
             }
-            catch (COMException ex) when (ex.ErrorCode == unchecked((int)0x80070002)) { return LegacyStartupTask.Absent; }
-            catch { return LegacyStartupTask.Unknown; }
+            catch (Exception ex) { return ClassifyTaskProbeError(ex); }
             finally
             {
                 foreach (object item in new[] { task, folder, service })
                     if (item != null && Marshal.IsComObject(item))
                         try { Marshal.FinalReleaseComObject(item); } catch { }
             }
+        }
+
+        // CLR COM interop marshals HRESULT 0x80070002 (ERROR_FILE_NOT_FOUND) from ITaskFolder.GetTask
+        // into FileNotFoundException rather than COMException; other errors (e.g. E_ACCESSDENIED) stay Unknown.
+        internal static LegacyStartupTask ClassifyTaskProbeError(Exception ex)
+        {
+            if (ex is System.Reflection.TargetInvocationException && ex.InnerException != null) ex = ex.InnerException;
+            if (ex is System.IO.FileNotFoundException) return LegacyStartupTask.Absent;
+            if (ex is COMException com && com.ErrorCode == unchecked((int)0x80070002)) return LegacyStartupTask.Absent;
+            return LegacyStartupTask.Unknown;
         }
     }
 }
