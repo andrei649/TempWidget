@@ -2,7 +2,7 @@ TempWidget 2 - a small desktop widget for temperatures, fans and other sensors
 ===============================================================================
 
 GETTING STARTED
-1. Install with TempWidget-2.1.0-x64.msi, or extract the portable zip anywhere
+1. Install with TempWidget-2.1.1-x64.msi, or extract the portable zip anywhere
    and run TempWidget.exe (keep the other files next to it).
 2. On first unpackaged start a welcome screen offers "Set up full sensors". One click:
    - Windows asks once for administrator rights
@@ -50,10 +50,11 @@ verified (currently: System76 Bonobo WS bonw16). On other Clevo-based laptops
 you can try Settings -> Display -> Laptop fan readout -> On (read-only).
 
 UPGRADING FROM VERSION 1
-Version 2 reads the same settings file. Full sensors now require an explicit
-request each session. Startup entries are never moved or elevated automatically.
-If an older TempWidget scheduled task exists, review and remove it manually in
-Windows Task Scheduler. The app warns about it but will not change that task.
+Version 2 reads the same settings file. Manual unpackaged launches honor your
+saved full-sensors preference; startup entries (--startup) are never moved or
+elevated automatically. If an older TempWidget scheduled task exists, review and
+remove it manually in Windows Task Scheduler. The app warns about it but will
+not change that task.
 
 CSV LOGGING
 Logging uses one file per day and column schema: TempWidget-v2-date-schema.csv.

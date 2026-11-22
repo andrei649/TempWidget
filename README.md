@@ -1,16 +1,20 @@
 # TempWidget
 
-Private source import of the supplied 2.1.0 Windows desktop sensor widget,
-with fixes for missing CPU temperatures, EC mutex ownership, invalid/stale
-fan RPM and elapsed-time polling of slow devices. This revision also removes
-privileged startup task creation/repair and separates CSV column schemas.
+Windows x64 (.NET Framework 4.8) desktop sensor widget (`2.1.1`), with fixes for
+missing CPU temperatures, EC mutex ownership, invalid/stale fan RPM, elapsed-time
+polling of slow devices, safe per-user startup (`--startup`) and versioned CSV
+column schemas.
 
-Targets Windows x64 and .NET Framework 4.8. This is an unreleased source
-revision, not an installed, signed or hardware-validated release.
+Version `2.1.1` adds live hardware-verified fixes on System76 Bonobo WS (`bonw16`):
 
-The reviewed Windows Release build passed with zero errors/warnings, and all
-64 synthetic tests passed. Real sensors, EC layout, visual rendering,
-sleep/resume, energy use and installer behavior remain untested.
+- **EC fan register cap on `bonw16`:** probes only the two physical fans (`0xD0`/`0xD2`) and skips unpopulated `0xD4`/`0xD5` so phantom `Fan 3` RPM values never latch.
+- **Task Scheduler absence probe (`0x80070002`):** treats CLR `System.IO.FileNotFoundException` from `ITaskFolder::GetTask` as an absent legacy task so no false `Review startup settings` banner appears after removing `\TempWidget`.
+- **Direct full-sensor manual launch (`PreferElevated`):** manual unpackaged launches honor `PreferElevated` after full-sensor setup (opening with administrator rights for CPU/NVMe/RAM/EC sensors), while Windows logon (`--startup`), MSIX, `--demo`, `--restarted` and `--limited` never auto-elevate.
+
+The Windows Release build passes with zero errors/warnings and all **68 synthetic
+tests** pass, alongside live desktop verification on `System76 Bonobo WS (bonw16)`.
+MSIX logon activation, code signing and sleep/resume remain untested on an
+installed Store package.
 
 Packaged launches conservatively skip automatic onboarding, including a first
 manual launch or settings reset. Full sensors can still be requested explicitly
@@ -49,7 +53,7 @@ GitHub and attaches them to a release named after `<Version>` in
 `TempWidget.csproj`. Either push a matching tag:
 
 ```bash
-git tag v2.1.0 && git push origin v2.1.0
+git tag v2.1.1 && git push origin v2.1.1
 ```
 
 or run **Actions > Release > Run workflow**. Running it again for the same

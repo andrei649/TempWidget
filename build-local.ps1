@@ -95,6 +95,34 @@ foreach ($doc in @('README.txt', 'PRIVACY.txt', 'THIRD-PARTY-NOTICES.txt')) {
   if (Test-Path -LiteralPath $srcDoc) { Copy-Item -Force -LiteralPath $srcDoc -Destination $distDir }
 }
 
+# Include official signed PawnIO 2.2.0 installer in dist\ (same SHA-256 as DriverSetup.cs / release.yml)
+# so fresh clones behave identically to GitHub Release portable zips when setting up full sensors.
+$pawnRedist = Join-Path $root 'redist\PawnIO_setup.exe'
+$pawnDist = Join-Path $distDir 'PawnIO_setup.exe'
+$pawnExpectedSha = '1f519a22e47187f70a1379a48ca604981c4fcf694f4e65b734aaa74a9fba3032'
+if (-not (Test-Path -LiteralPath $pawnRedist) -and -not (Test-Path -LiteralPath $pawnDist)) {
+  try {
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    $tmpPawn = Join-Path $env:TEMP ("PawnIO_setup_" + [Guid]::NewGuid().ToString('N') + ".exe")
+    Invoke-WebRequest -Uri 'https://github.com/namazso/PawnIO.Setup/releases/download/2.2.0/PawnIO_setup.exe' -OutFile $tmpPawn -UseBasicParsing -TimeoutSec 20
+    $actualSha = (Get-FileHash -LiteralPath $tmpPawn -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($actualSha -eq $pawnExpectedSha) {
+      New-Item -ItemType Directory -Force -Path (Split-Path -Parent $pawnRedist) | Out-Null
+      Move-Item -Force -LiteralPath $tmpPawn -Destination $pawnRedist
+    } else {
+      Remove-Item -Force -LiteralPath $tmpPawn -ErrorAction SilentlyContinue
+    }
+  } catch {
+    # Offline / restricted environments: skip silently (existing PawnIO install or basic mode still works).
+  }
+}
+if (Test-Path -LiteralPath $pawnRedist) {
+  $actualSha = (Get-FileHash -LiteralPath $pawnRedist -Algorithm SHA256).Hash.ToLowerInvariant()
+  if ($actualSha -eq $pawnExpectedSha) {
+    Copy-Item -Force -LiteralPath $pawnRedist -Destination $pawnDist
+  }
+}
+
 if ($head) {
   $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
   [System.IO.File]::WriteAllText($markerPath, $head + "`n", $utf8NoBom)
@@ -225,15 +253,18 @@ internal static class Launcher
         try
         {
             string ini = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TempWidget", "settings.ini");
-            if (!File.Exists(ini)) return true; // default on local dev launcher: full sensors
+            if (!File.Exists(ini)) return false; // let first-run WelcomeForm onboarding run unelevated first
+            bool hasVersion = false;
             foreach (string line in File.ReadAllLines(ini))
             {
                 if (line.StartsWith("PreferElevated=", StringComparison.OrdinalIgnoreCase))
                     return line.Substring("PreferElevated=".Length).Trim() != "0";
+                if (line.StartsWith("Version=", StringComparison.OrdinalIgnoreCase))
+                    hasVersion = true;
             }
+            return !hasVersion; // v1 files default PreferElevated=true; v2 without key defaults false
         }
-        catch { }
-        return true;
+        catch { return false; }
     }
 
     private static void StopUnelevatedRunningCopies(string targetExe)

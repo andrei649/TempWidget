@@ -105,3 +105,11 @@ and Windows-version-specific activation behavior remain unverified. The guarante
 is the conservative application policy, not experimentally proven logon detection.
 
 Local follow-up logs: `artifacts/msix-build.log`, `artifacts/msix-tests.log`.
+
+## 2.1.1 live hardware follow-up (2026-11-22)
+
+Live verification on System76 Bonobo WS (`bonw16`, Windows 11 x64) identified and resolved three runtime issues, covered by **68 synthetic tests** (`0 failed`):
+
+1. **System76 `bonw16` EC fan count (`Sensors.cs`, `EcPort.cs`):** `bonw16` populates two fans (`0xD0`, `0xD2`); unpopulated `0xD4`/`0xD5` could return `0x00F0` (`8984 RPM`). `VerifiedEcFanCount()` caps `bonw16` to 2 fans while keeping manual experimental mode (`EcMode == 1`) up to 3.
+2. **Task Scheduler COM `FileNotFoundException` (`AutoStart.cs`):** .NET COM interop projects `HRESULT 0x80070002` from `ITaskFolder::GetTask` as `System.IO.FileNotFoundException` rather than `COMException`. `ClassifyTaskProbeError` now treats `FileNotFoundException` and `DirectoryNotFoundException` as `LegacyStartupTask.Absent`.
+3. **Manual unpackaged `PreferElevated` (`LaunchOptions.cs`, `Program.cs`):** supersedes the earlier total suppression of `PreferElevated` on manual unpackaged launches only (`ShouldAutoElevate`), so double-clicking `TempWidget.exe` after full-sensor setup requests elevation directly while `--startup`, MSIX (`IsPackaged`), `--demo`, `--restarted` and `--limited` never auto-elevate.
