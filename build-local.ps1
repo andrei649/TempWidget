@@ -4,7 +4,8 @@
 
 param(
   [switch]$Quiet,
-  [switch]$Force
+  [switch]$Force,
+  [switch]$SkipLauncher
 )
 
 $ErrorActionPreference = 'Stop'
@@ -102,9 +103,19 @@ if ($head) {
 # Build a lightweight zero-console root launcher (.\TempWidget.exe, gitignored via *.exe)
 # with the app icon so double-clicking TempWidget.exe directly in the repo root builds if
 # stale and starts .\dist\TempWidget.exe cleanly without cluttering the root with DLLs.
+# Skip when invoked by the running launcher itself (-SkipLauncher) or if already locked.
 $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 $rootExe = Join-Path $root 'TempWidget.exe'
-if (Test-Path -LiteralPath $csc) {
+$needLauncher = (-not $SkipLauncher) -and (Test-Path -LiteralPath $csc) -and ($Force -or -not (Test-Path -LiteralPath $rootExe))
+if ($needLauncher -and (Test-Path -LiteralPath $rootExe)) {
+  try {
+    $lfs = [System.IO.File]::Open($rootExe, [System.IO.FileMode]::Open, [System.IO.FileAccess]::ReadWrite, [System.IO.FileShare]::None)
+    $lfs.Close()
+  } catch {
+    $needLauncher = $false
+  }
+}
+if ($needLauncher) {
   $launcherDir = Join-Path $root 'obj\launcher'
   New-Item -ItemType Directory -Force -Path $launcherDir | Out-Null
   $launcherCs = Join-Path $launcherDir 'Launcher.cs'
@@ -136,17 +147,26 @@ internal static class Launcher
 
         if (needBuild && File.Exists(builder))
         {
-            var psi = new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -File \"" + builder + "\"")
+            var psi = new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -File \"" + builder + "\" -SkipLauncher")
             {
                 WorkingDirectory = root,
                 UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
             };
             using (var p = Process.Start(psi))
             {
+                var err = new System.Text.StringBuilder();
+                p.ErrorDataReceived += (s, ev) => { if (ev.Data != null) err.AppendLine(ev.Data); };
+                p.BeginErrorReadLine();
+                string stdout = p.StandardOutput.ReadToEnd();
                 p.WaitForExit();
                 if (p.ExitCode != 0)
                 {
-                    MessageBox.Show("TempWidget local build failed (exit " + p.ExitCode + "). Run build-local.ps1 to inspect the output.",
+                    string detail = (err.ToString() + "\n" + stdout).Trim();
+                    if (detail.Length > 500) detail = detail.Substring(0, 500);
+                    MessageBox.Show("TempWidget local build failed (exit " + p.ExitCode + ").\n\n" + detail,
                         "TempWidget", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return p.ExitCode;
                 }
