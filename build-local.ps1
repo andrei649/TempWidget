@@ -145,6 +145,10 @@ internal static class Launcher
                 needBuild = true;
         }
 
+        bool wantAdmin = ShouldRequestAdmin(args);
+        if (needBuild || wantAdmin)
+            StopUnelevatedRunningCopies(target);
+
         if (needBuild && File.Exists(builder))
         {
             var psi = new ProcessStartInfo("powershell.exe", "-NoProfile -ExecutionPolicy Bypass -File \"" + builder + "\" -SkipLauncher")
@@ -180,8 +184,74 @@ internal static class Launcher
         }
 
         string forwarded = JoinArgs(args);
+        if (wantAdmin)
+        {
+            try
+            {
+                string adminArgs = string.IsNullOrEmpty(forwarded) ? "--restarted" : "--restarted " + forwarded;
+                Process.Start(new ProcessStartInfo(target, adminArgs) { Verb = "runas", WorkingDirectory = dist, UseShellExecute = true });
+                return 0;
+            }
+            catch
+            {
+                // UAC prompt declined: fall back gracefully to limited mode for this session.
+                forwarded = string.IsNullOrEmpty(forwarded) ? "--limited" : "--limited " + forwarded;
+            }
+        }
         Process.Start(new ProcessStartInfo(target, forwarded) { WorkingDirectory = dist, UseShellExecute = true });
         return 0;
+    }
+
+    private static bool ShouldRequestAdmin(string[] args)
+    {
+        if (args != null)
+        {
+            for (int i = 0; i < args.Length; i++)
+            {
+                string a = args[i] ?? "";
+                if (string.Equals(a, "--demo", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(a, "--startup", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(a, "--limited", StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+        }
+        try
+        {
+            using (var id = System.Security.Principal.WindowsIdentity.GetCurrent())
+                if (new System.Security.Principal.WindowsPrincipal(id).IsInRole(System.Security.Principal.WindowsBuiltInRole.Administrator))
+                    return false;
+        }
+        catch { }
+        try
+        {
+            string ini = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "TempWidget", "settings.ini");
+            if (!File.Exists(ini)) return true; // default on local dev launcher: full sensors
+            foreach (string line in File.ReadAllLines(ini))
+            {
+                if (line.StartsWith("PreferElevated=", StringComparison.OrdinalIgnoreCase))
+                    return line.Substring("PreferElevated=".Length).Trim() != "0";
+            }
+        }
+        catch { }
+        return true;
+    }
+
+    private static void StopUnelevatedRunningCopies(string targetExe)
+    {
+        int self = Process.GetCurrentProcess().Id;
+        foreach (var proc in Process.GetProcessesByName("TempWidget"))
+        {
+            try
+            {
+                if (proc.Id == self) continue;
+                string path = proc.MainModule != null ? proc.MainModule.FileName : "";
+                if (!string.Equals(path, targetExe, StringComparison.OrdinalIgnoreCase)) continue;
+                if (proc.CloseMainWindow()) proc.WaitForExit(1500);
+                if (!proc.HasExited) { proc.Kill(); proc.WaitForExit(1500); }
+            }
+            catch { /* elevated copy cannot be closed from unelevated launcher; leave untouched */ }
+            finally { proc.Dispose(); }
+        }
     }
 
     private static string ReadGitHead(string root)

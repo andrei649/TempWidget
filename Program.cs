@@ -76,6 +76,7 @@ namespace TempWidget
                         autoStart = welcome.StartWithWindows;
                     }
                     settings.Onboarded = true;
+                    settings.PreferElevated = full;
                     settings.Save();
 
                     if (full && IsElevated) { SetupRequested = true; SetupAutoStart = autoStart; }
@@ -90,9 +91,16 @@ namespace TempWidget
                     }
                     else if (autoStart) ConfigureStartup();
                 }
+                else if (launch.ShouldAutoElevate(settings.PreferElevated, IsElevated, Demo))
+                {
+                    if (owned) { mutex.ReleaseMutex(); owned = false; }
+                    if (RelaunchElevated(DriverSetup.IsInstalled() ? null : "--setup")) return 0;
+                    // UAC declined: continue with limited sensors for this session without looping.
+                    try { owned = mutex.WaitOne(0); } catch (AbandonedMutexException) { owned = true; }
+                    if (!owned) return 0;
+                }
 
-                // Persisted preferences never cause unattended elevation. Full sensors are
-                // requested explicitly through onboarding or the widget each session.
+                // Logon (--startup) and MSIX launches never cause unattended elevation.
 
                 try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
                 Application.Run(new WidgetForm(settings));
@@ -133,8 +141,15 @@ namespace TempWidget
         {
             try
             {
+                string exe = LaunchPath();
                 string arguments = "--restarted" + (string.IsNullOrEmpty(extraArgs) ? "" : " " + extraArgs);
-                Process.Start(new ProcessStartInfo(LaunchPath()) { Verb = "runas", UseShellExecute = true, Arguments = arguments });
+                Process.Start(new ProcessStartInfo(exe)
+                {
+                    Verb = "runas",
+                    UseShellExecute = true,
+                    Arguments = arguments,
+                    WorkingDirectory = Path.GetDirectoryName(exe) ?? "",
+                });
                 return true;
             }
             catch { return false; }
@@ -145,7 +160,13 @@ namespace TempWidget
         {
             try
             {
-                Process.Start(new ProcessStartInfo(LaunchPath()) { UseShellExecute = true, Arguments = "--restarted" });
+                string exe = LaunchPath();
+                Process.Start(new ProcessStartInfo(exe)
+                {
+                    UseShellExecute = true,
+                    Arguments = "--restarted",
+                    WorkingDirectory = Path.GetDirectoryName(exe) ?? "",
+                });
                 return true;
             }
             catch { return false; }

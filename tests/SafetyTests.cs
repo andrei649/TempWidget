@@ -78,6 +78,17 @@ namespace TempWidget.Tests
                 True(!explicitSetup.Startup && explicitSetup.Setup && explicitSetup.AutoStart);
                 True(!new LaunchOptions(new[] { "--autostart" }).AutoStart);
             });
+            run("PreferElevated auto-elevates only manual unpackaged launches", () =>
+            {
+                True(new LaunchOptions(new string[0], packaged: false).ShouldAutoElevate(preferElevated: true, isElevated: false, demo: false));
+                True(!new LaunchOptions(new string[0], packaged: false).ShouldAutoElevate(preferElevated: false, isElevated: false, demo: false));
+                True(!new LaunchOptions(new string[0], packaged: false).ShouldAutoElevate(preferElevated: true, isElevated: true, demo: false));
+                True(!new LaunchOptions(new[] { "--demo" }, packaged: false).ShouldAutoElevate(preferElevated: true, isElevated: false, demo: true));
+                True(!new LaunchOptions(new[] { "--startup" }, packaged: false).ShouldAutoElevate(preferElevated: true, isElevated: false, demo: false));
+                True(!new LaunchOptions(new string[0], packaged: true).ShouldAutoElevate(preferElevated: true, isElevated: false, demo: false));
+                True(!new LaunchOptions(new[] { "--restarted" }, packaged: false).ShouldAutoElevate(preferElevated: true, isElevated: false, demo: false));
+                True(!new LaunchOptions(new[] { "--limited" }, packaged: false).ShouldAutoElevate(preferElevated: true, isElevated: false, demo: false));
+            });
             run("CSV row order cannot reorder a schema's columns", () =>
             {
                 var rows = Rows(); Format(rows, out string h1, out string l1); rows.Reverse();

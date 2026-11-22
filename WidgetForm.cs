@@ -656,6 +656,7 @@ namespace TempWidget
         public void EnableFullSensors()
         {
             if (Program.IsElevated) return;
+            _settings.PreferElevated = true;
             SavePosition();
             // Also install the driver in the elevated copy if this PC does not have it yet.
             if (Program.RelaunchElevated(DriverSetup.IsInstalled() ? null : "--setup")) ExitApp();
