@@ -77,7 +77,12 @@ jobs:
       - name: Installer - silent install, start, uninstall
         run: |
           $p = Start-Process msiexec.exe -ArgumentList '/i', 'C:\friend\TempWidget-x64.msi', '/qn', '/l*v', 'C:\friend\install.log' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Get-Content C:\friend\install.log -Tail 40; throw "MSI install failed: $($p.ExitCode)" }
+          if ($p.ExitCode -ne 0) {
+            $log = Get-Content C:\friend\install.log
+            $log | Select-String -Pattern 'Return value 3' -Context 40,2 | ForEach-Object { $_.ToString() }
+            $log | Select-String -Pattern 'Error \d{4}|error code|CustomAction .* returned|Product: .* --' | ForEach-Object { $_.ToString() }
+            throw "MSI install failed: $($p.ExitCode)"
+          }
           $app = Join-Path $env:ProgramFiles 'TempWidget'
           foreach ($f in 'TempWidget.exe', 'LibreHardwareMonitorLib.dll', 'PawnIO_setup.exe') {
             if (-not (Test-Path (Join-Path $app $f))) { throw "Installer did not install $f" }
