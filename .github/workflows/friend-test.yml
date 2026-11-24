@@ -1,0 +1,104 @@
+name: Friend test (published release)
+
+# End-to-end check of what a friend does, on a clean Windows VM:
+#   1. download the PUBLISHED portable zip, extract it, start TempWidget.exe the way the
+#      welcome screen's "Set up full sensors" does (elevated, --setup), so the bundled
+#      PawnIO driver gets installed on a machine that does not have it, then read sensors;
+#   2. install the PUBLISHED MSI silently, start the installed app, uninstall it.
+# Runs by hand, on pushes to claude/e2e-** branches and after each successful Release. Installs a driver on the
+# throw-away GitHub runner only. Uses no secrets and publishes nothing.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/e2e-**']
+  # After every successful release (a workflow_run trigger only fires once this file is on main).
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  friend-test:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: windows-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      LATEST: https://github.com/andrei649/TempWidget/releases/latest/download
+    steps:
+      - name: Download the published files (no checkout, no token)
+        run: |
+          New-Item -ItemType Directory -Force -Path C:\friend | Out-Null
+          Invoke-WebRequest "$env:LATEST/TempWidget-portable.zip" -OutFile C:\friend\TempWidget-portable.zip
+          Invoke-WebRequest "$env:LATEST/TempWidget-x64.msi" -OutFile C:\friend\TempWidget-x64.msi
+          Get-ChildItem C:\friend | Format-Table Name, Length
+
+      - name: Portable zip - extract and check contents
+        run: |
+          Expand-Archive C:\friend\TempWidget-portable.zip -DestinationPath C:\friend\portable -Force
+          $app = 'C:\friend\portable\TempWidget'
+          foreach ($f in 'TempWidget.exe', 'TempWidget.exe.config', 'LibreHardwareMonitorLib.dll', 'PawnIO_setup.exe') {
+            if (-not (Test-Path (Join-Path $app $f))) { throw "Missing $f in the portable zip" }
+          }
+          $hash = (Get-FileHash (Join-Path $app 'PawnIO_setup.exe') -Algorithm SHA256).Hash.ToLower()
+          if ($hash -ne '1f519a22e47187f70a1379a48ca604981c4fcf694f4e65b734aaa74a9fba3032') { throw "PawnIO installer hash $hash" }
+          Write-Host 'Portable zip contents OK, PawnIO installer is the official 2.2.0.'
+
+      - name: Portable - first start with full-sensor setup on a PC without PawnIO
+        run: |
+          $key = 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\PawnIO'
+          Write-Host "PawnIO installed before: $(Test-Path $key)"
+          $dir = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'TempWidget'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          # State right after a user clicks "Set up full sensors" (welcome answered, CSV log on to read values).
+          Set-Content (Join-Path $dir 'settings.ini') @('Version=2', 'Onboarded=1', 'PreferElevated=1', 'EcMode=2', 'LogCsv=1', 'IntervalMs=2000')
+          $exe = 'C:\friend\portable\TempWidget\TempWidget.exe'
+          $p = Start-Process -FilePath $exe -ArgumentList '--restarted', '--setup' -PassThru
+          $deadline = (Get-Date).AddSeconds(150)
+          while (-not (Test-Path $key) -and (Get-Date) -lt $deadline -and -not $p.HasExited) { Start-Sleep 3 }
+          $installed = Test-Path $key
+          if ($installed) { Write-Host "PawnIO installed by TempWidget: version $((Get-ItemProperty $key).DisplayVersion)" }
+          Start-Sleep 30   # let the widget read sensors for a while
+          $alive = -not $p.HasExited
+          if ($alive) { $p.Kill(); $p.WaitForExit(10000) | Out-Null }
+          $log = Join-Path $dir 'error.log'
+          if (Test-Path $log) { Get-Content $log }
+          $csv = Get-ChildItem (Join-Path $dir 'logs') -Filter 'TempWidget-v2-*.csv' -ErrorAction SilentlyContinue | Select-Object -First 1
+          if ($csv) {
+            $lines = Get-Content $csv.FullName
+            Write-Host "CSV columns: $($lines[0])"
+            Write-Host "Last reading: $($lines[-1])"
+          } else { Write-Host 'No CSV log written.' }
+          if (-not $installed) { throw 'TempWidget did not install the bundled PawnIO driver' }
+          if (-not $alive) { throw "TempWidget exited early with code $($p.ExitCode)" }
+          if (Test-Path $log) { throw 'TempWidget wrote error.log' }
+          if (-not $csv) { throw 'No sensor readings were logged' }
+
+      - name: Installer - silent install, start, uninstall
+        run: |
+          $p = Start-Process msiexec.exe -ArgumentList '/i', 'C:\friend\TempWidget-x64.msi', '/qn', '/l*v', 'C:\friend\install.log' -Wait -PassThru
+          if ($p.ExitCode -ne 0) {
+            $log = Get-Content C:\friend\install.log
+            $log | Select-String -Pattern 'Return value 3' -Context 40,2 | ForEach-Object { $_.ToString() }
+            $log | Select-String -Pattern 'Error \d{4}|error code|CustomAction .* returned|Product: .* --' | ForEach-Object { $_.ToString() }
+            throw "MSI install failed: $($p.ExitCode)"
+          }
+          $app = Join-Path $env:ProgramFiles 'TempWidget'
+          foreach ($f in 'TempWidget.exe', 'LibreHardwareMonitorLib.dll', 'PawnIO_setup.exe') {
+            if (-not (Test-Path (Join-Path $app $f))) { throw "Installer did not install $f" }
+          }
+          $lnk = Get-ChildItem "$env:ProgramData\Microsoft\Windows\Start Menu\Programs" -Filter 'TempWidget*.lnk' -Recurse
+          Write-Host "Start menu shortcut: $($lnk.FullName)"
+          $shot = 'C:\friend\installed.png'
+          $r = Start-Process (Join-Path $app 'TempWidget.exe') -ArgumentList '--demo', '--shot', $shot -PassThru
+          if (-not $r.WaitForExit(90000)) { $r.Kill(); throw 'Installed TempWidget did not exit' }
+          if (-not (Test-Path $shot)) { throw 'Installed TempWidget did not render' }
+          $u = Start-Process msiexec.exe -ArgumentList '/x', 'C:\friend\TempWidget-x64.msi', '/qn' -Wait -PassThru
+          if ($u.ExitCode -ne 0) { throw "MSI uninstall failed: $($u.ExitCode)" }
+          if (Test-Path (Join-Path $app 'TempWidget.exe')) { throw 'Uninstall left TempWidget.exe behind' }
+          Write-Host 'MSI installed, started, rendered and uninstalled cleanly.'

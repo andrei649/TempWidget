@@ -57,6 +57,7 @@ print('''<?xml version="1.0" encoding="utf-8"?>
                   Execute="deferred" Impersonate="no" Return="ignore" />
     <InstallExecuteSequence>
       <Custom Action="SetCmd" Before="InstallValidate" />
+      <!-- build.sh renumbers these so RemoveExistingProducts directly follows InstallInitialize. -->
       <Custom Action="CloseApp" After="InstallInitialize" />
       <Custom Action="RemoveStartupTask" After="CloseApp">REMOVE="ALL" AND NOT UPGRADINGPRODUCTCODE</Custom>
     </InstallExecuteSequence>

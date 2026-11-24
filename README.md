@@ -25,10 +25,16 @@ Requires 64-bit Windows 10 (1809 or later) or Windows 11.
 
 ## For developers
 
-Windows x64 (.NET Framework 4.8) desktop sensor widget (`2.1.2`), with fixes for
+Windows x64 (.NET Framework 4.8) desktop sensor widget (`2.1.3`), with fixes for
 missing CPU temperatures, EC mutex ownership, invalid/stale fan RPM, elapsed-time
 polling of slow devices, safe per-user startup (`--startup`) and versioned CSV
 column schemas.
+
+Version `2.1.3` fixes the MSI installer, which failed on every machine with
+error 2613 (RemoveExistingProducts was not directly after InstallInitialize).
+`build.sh` now renumbers and checks that sequence, and a
+[friend test](.github/workflows/friend-test.yml) installs the published MSI and
+portable zip on a clean Windows VM.
 
 Version `2.1.2` shows a clear "extract the zip first" message when
 `TempWidget.exe` is opened from inside the downloaded zip, and adds friend-facing
@@ -82,7 +88,7 @@ GitHub and attaches them to a release named after `<Version>` in
 `TempWidget.csproj`. Either push a matching tag:
 
 ```bash
-git tag v2.1.2 && git push origin v2.1.2
+git tag v2.1.3 && git push origin v2.1.3
 ```
 
 or run **Actions > Release > Run workflow**. Running it again for the same

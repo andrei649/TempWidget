@@ -17,7 +17,15 @@ cp redist/PawnIO_setup.exe dist/TempWidget/   # official signed installer, run o
 (cd dist && zip -qr "TempWidget-$VERSION-portable.zip" TempWidget)
 
 python3 installer/make-wxs.py dist/TempWidget "$VERSION" "$PUBLISHER" Assets/TempWidget.ico > dist/TempWidget.wxs
-wixl --arch x64 -o "dist/TempWidget-$VERSION-x64.msi" dist/TempWidget.wxs
+MSI="dist/TempWidget-$VERSION-x64.msi"
+wixl --arch x64 -o "$MSI" dist/TempWidget.wxs
+# wixl puts RemoveExistingProducts after our deferred actions, but Windows Installer requires it
+# directly after InstallInitialize, or every install fails with error 2613. Renumber, then verify.
+msibuild "$MSI" -q "UPDATE \`InstallExecuteSequence\` SET \`Sequence\` = 1501 WHERE \`Action\` = 'RemoveExistingProducts'"
+msibuild "$MSI" -q "UPDATE \`InstallExecuteSequence\` SET \`Sequence\` = 1502 WHERE \`Action\` = 'CloseApp'"
+msibuild "$MSI" -q "UPDATE \`InstallExecuteSequence\` SET \`Sequence\` = 1503 WHERE \`Action\` = 'RemoveStartupTask'"
+ORDER=$(msiinfo export "$MSI" InstallExecuteSequence | tail -n +4 | sort -t$'\t' -k3 -n | cut -f1 | tr -d '\r' | grep -A1 -x InstallInitialize | tail -1)
+if [ "$ORDER" != "RemoveExistingProducts" ]; then echo "MSI sequence check failed: '$ORDER' follows InstallInitialize" >&2; exit 1; fi
 
 zip -qr "dist/TempWidget-$VERSION-source.zip" *.cs *.csproj *.txt *.md App.config app.manifest build.sh Start.cmd build-local.ps1 .gitignore Assets installer package redist tests -x 'tests/bin/*' 'tests/obj/*'
 ls -la dist
