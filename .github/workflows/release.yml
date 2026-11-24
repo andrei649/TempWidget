@@ -71,5 +71,5 @@ jobs:
             gh release upload "$TAG" "${FILES[@]}" --clobber
           else
             gh release create "$TAG" "${FILES[@]}" --target "$GITHUB_SHA" --title "TempWidget ${VERSION}" \
-              --notes "Portable: extract the zip and run TempWidget.exe. Installer: run the .msi. Unsigned build: Windows SmartScreen may warn on first start."
+              --notes-file .github/release-notes.md
           fi
