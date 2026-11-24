@@ -19,6 +19,7 @@ namespace TempWidget
         private readonly EcFans _ecFans;
         private readonly PollSchedule _schedule = new PollSchedule();
         private string _netAdapter; // identifier of the network adapter being shown
+        private int _disposed;
 
         public LhmSource(Settings s)
         {
@@ -515,10 +516,21 @@ namespace TempWidget
             foreach (var sub in hw.SubHardware) Dump(sb, sub, indent + "  ");
         }
 
+        internal static void DisposeHardwareResources(IDisposable ecFans, Action closeComputer)
+        {
+            try { ecFans?.Dispose(); }
+            catch (Exception ex) { Program.Log(ex); }
+            finally
+            {
+                try { closeComputer?.Invoke(); }
+                catch (Exception ex) { Program.Log(ex); }
+            }
+        }
+
         public void Dispose()
         {
-            _ecFans?.Dispose();
-            try { _computer.Close(); } catch { }
+            if (System.Threading.Interlocked.Exchange(ref _disposed, 1) != 0) return;
+            DisposeHardwareResources(_ecFans, () => _computer?.Close());
         }
     }
 }

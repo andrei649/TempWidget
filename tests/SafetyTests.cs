@@ -237,6 +237,81 @@ namespace TempWidget.Tests
                     Equal(1, alerts.Check(rows, settings, v => v.ToString()).Count);
                 }
             });
+            run("LhmSource hardware disposal closes Computer even when EC disposal throws", () =>
+            {
+                int closed = 0;
+                LhmSource.DisposeHardwareResources(new ThrowingDisposable(), () => closed++);
+                Equal(1, closed);
+            });
+            run("SensorWorker deterministic stop disposes active source once on normal exit", () =>
+            {
+                var source = new FakeSensorSource();
+                var opened = new System.Threading.ManualResetEventSlim(false);
+                var worker = new SensorWorker();
+                worker.Start(() =>
+                {
+                    try
+                    {
+                        var current = worker.ReplaceSource(() => source);
+                        opened.Set();
+                        while (!worker.Stopping && current != null)
+                        {
+                            current.Poll(false);
+                            worker.WaitNext(200);
+                        }
+                    }
+                    finally { worker.ReleaseCurrentSource(); }
+                });
+                True(opened.Wait(2000));
+                True(worker.Stop(2000));
+                worker.Dispose();
+                Equal(1, source.Disposals);
+            });
+            run("SensorWorker deterministic stop still disposes active source on worker join timeout", () =>
+            {
+                var source = new FakeSensorSource();
+                var entered = new System.Threading.ManualResetEventSlim(false);
+                var unblock = new System.Threading.ManualResetEventSlim(false);
+                var finished = new System.Threading.ManualResetEventSlim(false);
+                var worker = new SensorWorker();
+                worker.Start(() =>
+                {
+                    try
+                    {
+                        worker.ReplaceSource(() => source);
+                        entered.Set();
+                        unblock.Wait(5000);
+                    }
+                    finally
+                    {
+                        worker.ReleaseCurrentSource();
+                        finished.Set();
+                    }
+                });
+                True(entered.Wait(2000));
+                bool joined = worker.Stop(40);
+                Equal(false, joined);
+                // Even though Join(40) timed out, active source must already be deterministically disposed.
+                Equal(1, source.Disposals);
+                unblock.Set();
+                True(finished.Wait(2000));
+                // Late worker completion must not double-dispose the source.
+                Equal(1, source.Disposals);
+                worker.Dispose();
+            });
+            run("SensorWorker racing source creation during shutdown immediately disposes late-opened source", () =>
+            {
+                var lateSource = new FakeSensorSource();
+                var worker = new SensorWorker();
+                var accepted = worker.ReplaceSource(() =>
+                {
+                    worker.Stop(0);
+                    return lateSource;
+                });
+                Equal<ISensorSource>(null, accepted);
+                Equal(1, lateSource.Disposals);
+                Equal<ISensorSource>(null, worker.ReplaceSource(() => new FakeSensorSource()));
+            });
         }
 
         private static List<Row> Rows() => new List<Row>
@@ -264,6 +339,17 @@ namespace TempWidget.Tests
             public string ReadRunValue() => Command;
             public void WriteRunValue(string value) { Writes++; Command = value; }
             public void DeleteRunValue() { Deletes++; Command = null; }
+        }
+        private sealed class ThrowingDisposable : IDisposable
+        {
+            public void Dispose() { throw new InvalidOperationException("Synthetic EC dispose failure"); }
+        }
+        private sealed class FakeSensorSource : ISensorSource
+        {
+            public int Disposals;
+            public List<Row> Poll(bool light) => new List<Row>();
+            public string Report() => "Synthetic";
+            public void Dispose() { System.Threading.Interlocked.Increment(ref Disposals); }
         }
     }
 }

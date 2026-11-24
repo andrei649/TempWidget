@@ -116,7 +116,8 @@ namespace TempWidget
                 // Logon (--startup) and MSIX launches never cause unattended elevation.
 
                 try { Process.GetCurrentProcess().PriorityClass = ProcessPriorityClass.BelowNormal; } catch { }
-                Application.Run(new WidgetForm(settings));
+                using (var form = new WidgetForm(settings))
+                    Application.Run(form);
                 return 0;
             }
             catch (Exception ex)

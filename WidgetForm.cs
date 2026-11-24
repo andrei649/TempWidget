@@ -18,12 +18,13 @@ namespace TempWidget
         private readonly NotifyIcon _tray;
         private readonly ContextMenuStrip _menu;
         private readonly ToolTip _tip = new ToolTip { InitialDelay = 400, ReshowDelay = 100, AutoPopDelay = 8000 };
-        private readonly AutoResetEvent _wake = new AutoResetEvent(false);
-        private readonly Thread _worker;
+        private readonly SensorWorker _sensorWorker = new SensorWorker();
         private readonly Alerts _alerts = new Alerts();
         private readonly Dictionary<string, History> _history = new Dictionary<string, History>();
         private DateTime _rangeSince = DateTime.Now;
         private SettingsForm _settingsForm;
+        private System.Windows.Forms.Timer _shotTimer;
+        private int _shutdownCompleted;
         private Row _setupNotice; // result of driver setup, shown above everything else
         private Row _startupNotice;
 
@@ -84,8 +85,7 @@ namespace TempWidget
             }
             catch { }
 
-            _worker = new Thread(WorkerLoop) { IsBackground = true, Priority = ThreadPriority.BelowNormal, Name = "sensors" };
-            _worker.Start();
+            _sensorWorker.Start(WorkerLoop, "sensors", ThreadPriority.BelowNormal);
 
             int shot = Array.IndexOf(Program.Args, "--shot");
             if (Program.Demo && shot >= 0 && shot + 1 < Program.Args.Length) ScheduleScreenshots(Program.Args[shot + 1]);
@@ -107,7 +107,7 @@ namespace TempWidget
             int failures = 0, warmup = Program.Demo ? History.Capacity : 0;
             try
             {
-                while (!_exiting)
+                while (!_exiting && !_sensorWorker.Stopping)
                 {
                     var s = _settings;
                     bool visible = _shown && !_sessionLocked;
@@ -123,9 +123,8 @@ namespace TempWidget
                             if (_rebuild || source == null)
                             {
                                 _rebuild = false;
-                                source?.Dispose();
-                                source = null;
-                                source = Program.Demo ? (ISensorSource)new DemoSource(s) : new LhmSource(s);
+                                source = _sensorWorker.ReplaceSource(() => Program.Demo ? (ISensorSource)new DemoSource(s) : new LhmSource(s));
+                                if (source == null) break;
                                 trim = true;
                             }
                             if (active)
@@ -141,13 +140,14 @@ namespace TempWidget
                             {
                                 _reportCallback = null;
                                 string text = source.Report();
-                                if (IsHandleCreated && !_exiting) BeginInvoke((Action)(() => report(text)));
+                                if (IsHandleCreated && !_exiting && !_sensorWorker.Stopping) BeginInvoke((Action)(() => report(text)));
                             }
                         }
                         catch (Exception ex)
                         {
+                            if (_exiting || _sensorWorker.Stopping) break;
                             if (failures++ == 0) Program.Log(ex);
-                            try { source?.Dispose(); } catch { }
+                            _sensorWorker.ReleaseCurrentSource();
                             source = null;
                             _reportCallback = null;
                             // A program file that Windows would not load stays unloadable until the app restarts.
@@ -165,10 +165,10 @@ namespace TempWidget
                     if (active && s.BatterySaver && OnBattery()) wait = wait * 5 / 2;
                     if (active && failures > 0) wait = Math.Max(wait, 15000);
                     if (warmup > 0) { warmup--; wait = 0; } // demo: fill the history immediately
-                    _wake.WaitOne(wait);
+                    _sensorWorker.WaitNext(wait);
                 }
             }
-            finally { try { source?.Dispose(); } catch { } }
+            finally { _sensorWorker.ReleaseCurrentSource(); }
         }
 
         /// <summary>First-run setup on the worker thread, before any sensor is opened.</summary>
@@ -259,7 +259,7 @@ namespace TempWidget
         public void RequestReport(Action<string> done)
         {
             _reportCallback = done;
-            _wake.Set();
+            _sensorWorker.Wake();
         }
 
         // ---------- readings (UI thread) ----------
@@ -701,20 +701,20 @@ namespace TempWidget
         {
             base.OnVisibleChanged(e);
             _shown = Visible;
-            _wake.Set();
+            _sensorWorker.Wake();
         }
 
         private void OnSessionSwitch(object sender, SessionSwitchEventArgs e)
         {
             // No point reading sensors while nobody can see them.
             if (e.Reason == SessionSwitchReason.SessionLock) _sessionLocked = true;
-            else if (e.Reason == SessionSwitchReason.SessionUnlock) { _sessionLocked = false; _wake.Set(); }
+            else if (e.Reason == SessionSwitchReason.SessionUnlock) { _sessionLocked = false; _sensorWorker.Wake(); }
         }
 
         private void OnPowerModeChanged(object sender, PowerModeChangedEventArgs e)
         {
             // Driver handles can go stale across sleep; reopen the sensors on wake.
-            if (e.Mode == PowerModes.Resume) { _rebuild = true; _wake.Set(); }
+            if (e.Mode == PowerModes.Resume) { _rebuild = true; _sensorWorker.Wake(); }
         }
 
         private void ToggleVisible()
@@ -750,7 +750,7 @@ namespace TempWidget
             if (n.Fahrenheit != old.Fahrenheit) _trayShown = int.MinValue + 1; // force the tray number to redraw
             if (n.TrayMode != old.TrayMode) { ShowStaticTray(); _trayShown = int.MinValue; }
             Relayout();
-            _wake.Set();
+            _sensorWorker.Wake();
         }
 
         // Click-through only works on a layered window, which WinForms creates for any opacity below 100%.
@@ -828,8 +828,9 @@ namespace TempWidget
             Close();
         }
 
-        protected override void OnFormClosing(FormClosingEventArgs e)
+        private void ShutdownWorkerAndHandles()
         {
+            if (Interlocked.Exchange(ref _shutdownCompleted, 1) != 0) return;
             _exiting = true;
             try
             {
@@ -837,22 +838,51 @@ namespace TempWidget
                 SystemEvents.PowerModeChanged -= OnPowerModeChanged;
             }
             catch { }
-            if (!Program.Demo) SavePosition();
-            _tray.Visible = false;
-            _wake.Set();
-            _worker.Join(3000); // let the worker close the driver cleanly
+            try
+            {
+                _shotTimer?.Stop();
+                _shotTimer?.Dispose();
+                _shotTimer = null;
+            }
+            catch { }
+            if (_tray != null) _tray.Visible = false;
+            _sensorWorker.Stop(3000);
             Native.FreeIcon(_trayHandle);
+            _trayHandle = IntPtr.Zero;
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            _exiting = true;
+            if (!Program.Demo) SavePosition();
+            ShutdownWorkerAndHandles();
             base.OnFormClosing(e);
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                ShutdownWorkerAndHandles();
+                try { _settingsForm?.Dispose(); } catch { }
+                try { _tray?.Dispose(); } catch { }
+                try { _menu?.Dispose(); } catch { }
+                try { _tip?.Dispose(); } catch { }
+                try { _font?.Dispose(); } catch { }
+                try { _headerFont?.Dispose(); } catch { }
+                try { _sensorWorker?.Dispose(); } catch { }
+            }
+            base.Dispose(disposing);
         }
 
         // ---------- demo screenshots (--demo --shot <file.png>) ----------
 
         private void ScheduleScreenshots(string path)
         {
-            var timer = new System.Windows.Forms.Timer { Interval = 1500 };
-            timer.Tick += (s, e) =>
+            _shotTimer = new System.Windows.Forms.Timer { Interval = 1500 };
+            _shotTimer.Tick += (s, e) =>
             {
-                timer.Stop();
+                _shotTimer?.Stop();
                 try
                 {
                     Snapshot(this, path);
@@ -876,7 +906,7 @@ namespace TempWidget
                 catch (Exception ex) { Program.Log(ex); }
                 ExitApp();
             };
-            timer.Start();
+            _shotTimer.Start();
         }
 
         private static void Snapshot(Form f, string path)
