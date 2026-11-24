@@ -58,6 +58,19 @@ namespace TempWidget
                 Application.EnableVisualStyles();
                 Application.SetCompatibleTextRenderingDefault(false);
 
+                // Opened straight from inside the downloaded zip, Windows copies only TempWidget.exe to a
+                // temporary folder; without its libraries the widget could only show errors.
+                if (!Demo && MissingInstallFiles(Path.GetDirectoryName(Application.ExecutablePath)).Count > 0)
+                {
+                    MessageBox.Show(
+                        "TempWidget can't find the files it needs next to TempWidget.exe.\n\n" +
+                        "If you opened it from inside the downloaded zip, extract the zip first: right-click it, " +
+                        "choose \"Extract All\", then run TempWidget.exe from the extracted folder.\n\n" +
+                        "Otherwise, download TempWidget again; a file is missing from this copy.",
+                        "TempWidget", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return 1;
+                }
+
                 int welcomeShot = Array.IndexOf(args, "--shot-welcome");
                 if (Demo && welcomeShot >= 0 && welcomeShot + 1 < args.Length) return ScreenshotWelcome(args[welcomeShot + 1]);
 
@@ -116,6 +129,18 @@ namespace TempWidget
                 if (owned) try { mutex.ReleaseMutex(); } catch { }
                 mutex?.Dispose();
             }
+        }
+
+        /// <summary>Files that must sit next to TempWidget.exe for the sensors to load.</summary>
+        internal static readonly string[] RequiredFiles = { "LibreHardwareMonitorLib.dll", "TempWidget.exe.config" };
+
+        /// <summary>Which of <see cref="RequiredFiles"/> are absent from <paramref name="folder"/>.</summary>
+        internal static System.Collections.Generic.List<string> MissingInstallFiles(string folder)
+        {
+            var missing = new System.Collections.Generic.List<string>();
+            foreach (string name in RequiredFiles)
+                if (string.IsNullOrEmpty(folder) || !File.Exists(Path.Combine(folder, name))) missing.Add(name);
+            return missing;
         }
 
         /// <summary>Path that starts this app: the stable alias for Store installs, the exe otherwise.</summary>

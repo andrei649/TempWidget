@@ -18,10 +18,29 @@ function Say([string]$msg) {
   if (-not $Quiet) { Write-Host $msg }
 }
 
+$releasesUrl = 'https://github.com/andrei649/TempWidget/releases/latest'
+
+# A "Download ZIP" of the source has no .git folder; git would then fail (and, under
+# Windows PowerShell 5.1 with ErrorActionPreference=Stop, abort the whole script).
 $head = ''
-if (Get-Command git -ErrorAction SilentlyContinue) {
-  $gitOut = & git -C $root rev-parse HEAD 2>$null
-  if ($LASTEXITCODE -eq 0 -and $gitOut) { $head = "$gitOut".Trim() }
+if ((Test-Path -LiteralPath (Join-Path $root '.git')) -and (Get-Command git -ErrorAction SilentlyContinue)) {
+  try {
+    $gitOut = & git -C $root rev-parse HEAD 2>$null
+    if ($LASTEXITCODE -eq 0 -and $gitOut) { $head = "$gitOut".Trim() }
+  } catch { $head = '' }
+}
+
+# Building needs the .NET SDK. Someone who only wants to use TempWidget should not need it:
+# send them to the ready-to-run download instead of failing with a compiler error.
+if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
+  Write-Host ''
+  Write-Host 'This folder contains the TempWidget SOURCE CODE, which needs the .NET SDK to build.'
+  Write-Host 'To just use TempWidget, download the ready-to-run app instead:'
+  Write-Host "  $releasesUrl"
+  Write-Host '  (TempWidget-<version>-portable.zip: extract it and run TempWidget.exe)'
+  Write-Host ''
+  try { Start-Process $releasesUrl } catch { }
+  exit 64
 }
 
 $rootExe = Join-Path $root 'TempWidget.exe'

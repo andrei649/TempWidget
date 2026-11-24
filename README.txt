@@ -2,8 +2,11 @@ TempWidget 2 - a small desktop widget for temperatures, fans and other sensors
 ===============================================================================
 
 GETTING STARTED
-1. Install with TempWidget-2.1.1-x64.msi, or extract the portable zip anywhere
-   and run TempWidget.exe (keep the other files next to it).
+1. Install with TempWidget-<version>-x64.msi, or extract the portable zip
+   anywhere (right-click > Extract All) and run TempWidget.exe from the
+   extracted folder. Keep the other files next to it.
+   The download is not code-signed, so Windows may show "Windows protected
+   your PC": click "More info", then "Run anyway".
 2. On first unpackaged start a welcome screen offers "Set up full sensors". One click:
    - Windows asks once for administrator rights
    - the PawnIO sensor driver is installed for you (included, no download)

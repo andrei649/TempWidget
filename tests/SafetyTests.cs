@@ -12,6 +12,16 @@ namespace TempWidget.Tests
 
         internal static void Register(Action<string, Action> run)
         {
+            run("Launch from inside a zip is detected by missing companion files", () =>
+            {
+                string dir = Sandbox();
+                Equal(2, TempWidget.Program.MissingInstallFiles(dir).Count);
+                Equal(2, TempWidget.Program.MissingInstallFiles(null).Count);
+                File.WriteAllText(Path.Combine(dir, "LibreHardwareMonitorLib.dll"), "");
+                Equal("TempWidget.exe.config", TempWidget.Program.MissingInstallFiles(dir).Single());
+                File.WriteAllText(Path.Combine(dir, "TempWidget.exe.config"), "");
+                Equal(0, TempWidget.Program.MissingInstallFiles(dir).Count);
+            });
             run("Startup only requests a quoted per-user basic-mode command", () =>
             {
                 var store = new FakeStartupStore();

@@ -1,6 +1,6 @@
 # Builds an .msix for the packaged Store route (STORE.md, option B). Run on Windows.
 # Needs the Windows SDK (for makeappx.exe). Usage:  .\build-msix.ps1 -AppFolder ..\dist\TempWidget
-param([Parameter(Mandatory = $true)][string]$AppFolder, [string]$Output = "TempWidget-2.1.1-x64.msix")
+param([Parameter(Mandatory = $true)][string]$AppFolder, [string]$Output = "TempWidget-2.1.2-x64.msix")
 $ErrorActionPreference = "Stop"
 
 $makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" -ErrorAction SilentlyContinue |

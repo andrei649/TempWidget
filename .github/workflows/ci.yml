@@ -1,8 +1,10 @@
 name: CI
 
-# Builds the application and the synthetic test runner, then runs only the
-# synthetic tests. It never launches TempWidget, installs a driver, touches
-# autostart, uses secrets, publishes, or uploads build outputs.
+# Builds the application and the synthetic test runner, runs the synthetic
+# tests, then starts the built TempWidget.exe once in --demo mode (simulated
+# readings: no hardware access, no driver, no onboarding, no autostart) to prove
+# the real executable starts and renders on Windows. It uses no secrets,
+# publishes nothing and uploads no build outputs.
 
 on:
   pull_request:
@@ -55,3 +57,37 @@ jobs:
         run: |
           dotnet build TempWidget.csproj -c Release --no-incremental "-consoleLoggerParameters:Summary"
           if ($LASTEXITCODE -ne 0) { throw "Application build failed with exit code $LASTEXITCODE" }
+
+      - name: Smoke-run the built app on Windows (demo mode)
+        run: |
+          $exe = (Resolve-Path './bin/Release/net48/win-x64/TempWidget.exe').Path
+          $shot = Join-Path $PWD 'smoke.png'
+          $log = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'TempWidget\error.log'
+          if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log }
+          # --demo --shot renders the widget with simulated readings, saves a screenshot and exits.
+          $p = Start-Process -FilePath $exe -ArgumentList @('--demo', '--shot', "`"$shot`"") -PassThru
+          if (-not $p.WaitForExit(90000)) { $p.Kill(); throw 'TempWidget did not exit within 90 s' }
+          if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log; throw 'TempWidget wrote error.log' }
+          if (-not (Test-Path -LiteralPath $shot)) { throw 'No screenshot: the widget did not render' }
+          $size = (Get-Item -LiteralPath $shot).Length
+          if ($size -lt 2000) { throw "Screenshot is only $size bytes" }
+          Write-Host "TempWidget started, rendered and exited cleanly (exit code $($p.ExitCode), screenshot $size bytes)."
+
+      - name: Smoke-run the built app on Windows (real sensor library)
+        run: |
+          # Starts the normal app for 25 s so the real sensor library loads and polls this
+          # VM's hardware. The settings file skips the welcome screen and turns off the
+          # laptop-fan EC readout. No --setup: nothing is installed and autostart is untouched.
+          $exe = (Resolve-Path './bin/Release/net48/win-x64/TempWidget.exe').Path
+          $dir = Join-Path ([Environment]::GetFolderPath('ApplicationData')) 'TempWidget'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          Set-Content -LiteralPath (Join-Path $dir 'settings.ini') -Value @('Version=2', 'Onboarded=1', 'PreferElevated=0', 'EcMode=2')
+          $log = Join-Path $dir 'error.log'
+          if (Test-Path -LiteralPath $log) { Remove-Item -LiteralPath $log }
+          $p = Start-Process -FilePath $exe -PassThru
+          Start-Sleep -Seconds 25
+          $alive = -not $p.HasExited
+          if ($alive) { $p.Kill(); $p.WaitForExit(10000) | Out-Null }
+          if (Test-Path -LiteralPath $log) { Get-Content -LiteralPath $log; throw 'TempWidget wrote error.log while reading sensors' }
+          if (-not $alive) { throw "TempWidget exited early with code $($p.ExitCode)" }
+          Write-Host 'TempWidget ran 25 s with the real sensor library and logged no errors.'

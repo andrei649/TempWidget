@@ -20,9 +20,16 @@ if defined HEAD_SHA if /I not "%HEAD_SHA%"=="%BUILT_SHA%" set "NEED_BUILD=1"
 if "%NEED_BUILD%"=="1" (
   echo [TempWidget] Building latest local version into dist\ ...
   powershell -NoProfile -ExecutionPolicy Bypass -File "%ROOT%build-local.ps1"
+  if errorlevel 64 if not errorlevel 65 (
+    echo [TempWidget] Opened the download page in your browser. Press any key to close.
+    pause >nul
+    exit /b 64
+  )
   if errorlevel 1 (
     echo.
-    echo [TempWidget] Build failed. Press any key to close.
+    echo [TempWidget] Build failed. To just use TempWidget, download the ready-to-run app:
+    echo   https://github.com/andrei649/TempWidget/releases/latest
+    echo Press any key to close.
     pause >nul
     exit /b 1
   )
