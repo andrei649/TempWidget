@@ -5,19 +5,24 @@ name: Friend test (published release)
 #      welcome screen's "Set up full sensors" does (elevated, --setup), so the bundled
 #      PawnIO driver gets installed on a machine that does not have it, then read sensors;
 #   2. install the PUBLISHED MSI silently, start the installed app, uninstall it.
-# Runs only by hand or on pushes to claude/e2e-** branches. Installs a driver on the
+# Runs by hand, on pushes to claude/e2e-** branches and after each successful Release. Installs a driver on the
 # throw-away GitHub runner only. Uses no secrets and publishes nothing.
 
 on:
   workflow_dispatch:
   push:
     branches: ['claude/e2e-**']
+  # After every successful release (a workflow_run trigger only fires once this file is on main).
+  workflow_run:
+    workflows: [Release]
+    types: [completed]
 
 permissions:
   contents: read
 
 jobs:
   friend-test:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: windows-latest
     timeout-minutes: 20
     defaults:
