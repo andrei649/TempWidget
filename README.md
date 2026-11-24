@@ -6,11 +6,15 @@ network connections.
 
 ## Download and run
 
-**[Download the latest version](https://github.com/andrei649/TempWidget/releases/latest)**, then pick one file:
+### ⬇️ [Download TempWidget (portable zip)](https://github.com/andrei649/TempWidget/releases/latest/download/TempWidget-portable.zip)
 
-- **`TempWidget-<version>-portable.zip`** (no installation): right-click the zip,
-  choose **Extract All**, and run `TempWidget.exe` from the extracted folder.
-- **`TempWidget-<version>-x64.msi`**: installs it with a Start menu shortcut.
+Right-click the downloaded zip, choose **Extract All**, and run `TempWidget.exe`
+from the extracted folder. Prefer an installer? Get
+[TempWidget-x64.msi](https://github.com/andrei649/TempWidget/releases/latest/download/TempWidget-x64.msi).
+Older versions are on the [Releases page](https://github.com/andrei649/TempWidget/releases).
+
+> **Not** the green **Code → Download ZIP** button: that is the source code, which
+> has no `TempWidget.exe` and needs the .NET SDK to build.
 
 The download is not code-signed, so Windows may show **"Windows protected your
 PC"**: click **More info**, then **Run anyway**. On first start choose **Set up
@@ -54,7 +58,7 @@ from the widget. MSIX logon activation has not been tested on an installed packa
 
 ## Run locally (latest / WIP)
 
-Double-click `TempWidget.exe` or `Start.cmd` in the repository root to build (automatically when `dist\TempWidget.exe` is missing or behind the current commit) and launch the latest local build from `dist\TempWidget.exe`.
+For developers with a git clone and the .NET SDK: double-click `TempWidget.exe` or `Start.cmd` in the repository root to build (automatically when `dist\TempWidget.exe` is missing or behind the current commit) and launch the latest local build from `dist\TempWidget.exe`.
 
 - Rebuild explicitly: `Start.cmd --rebuild` or `powershell -NoProfile -ExecutionPolicy Bypass -File .\build-local.ps1 -Force`
 - Run simulated demo mode: `TempWidget.exe --demo` or `Start.cmd --demo`

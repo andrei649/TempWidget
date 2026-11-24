@@ -4,8 +4,10 @@ A small always-on-top Windows widget for CPU and GPU temperature, load, fans, RA
 
 | File | For |
 |---|---|
-| **`TempWidget-*-portable.zip`** | No installation. Right-click the zip, **Extract All**, then run `TempWidget.exe` from the extracted folder. |
-| **`TempWidget-*-x64.msi`** | Installs to Program Files with a Start menu shortcut. |
+| **`TempWidget-portable.zip`** | No installation. Right-click the zip, **Extract All**, then run `TempWidget.exe` from the extracted folder. |
+| **`TempWidget-x64.msi`** | Installs to Program Files with a Start menu shortcut. |
+
+The files with a version number in the name are the same builds. Ignore "Source code": that is not the app.
 
 Needs Windows 10 (1809 or later) or Windows 11, 64-bit.
 
